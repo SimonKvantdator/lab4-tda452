@@ -1,0 +1,7 @@
+Proposition for our own project in lab 4 by Emma Ringström and Simon Jacobsson.
+
+We want to implement a simplifier of symbolic expressions. The simplifier takes
+an expression involving some symbolic variables and a list of relations between
+these variables and returns an (approximately) simplest form of the expression.
+If there is time, we also want to implement a function that takes an expression
+and returns TeX code for typesetting that expression.
