@@ -18,8 +18,13 @@ data Expr =
     N Integer
     | V Variable
     | Add Expr AddOp Expr
+    -- | Add [Expr]
+    -- | Mul [Expr]
     | Mul Expr MulOp Expr
     | Pow Expr Expr
+
+-- sortFun (V Var s) = s
+-- sortFun (N n) = show n
 
 data AddOp =
    Plus | Minus 
@@ -79,27 +84,59 @@ rule = (Var "x", Mul (N 2) Times y)
 
 
 applyRule :: Rule -> Expr -> Expr
+applyRule (x, e) (V y)
+    | x == y                = e
+applyRule r (Add e1 op e2)  = Add (applyRule r e1) op (applyRule r e2)
+applyRule r (Mul e1 op e2)  = Mul (applyRule r e1) op (applyRule r e2)
+applyRule r (Pow e1 e2)     = Pow (applyRule r e1) (applyRule r e2)
+applyRule r e               = e
+
+
+
 -- applyRules :: [Rule] -> Expr -> Expr
 -- applyRules rs (V x) = fromMaybe (V x) (lookup x rs)
 
--- toCanonical (x1 + x2) * (x3 + x4) = x1 * x2 + x1 * x3 +...
--- toCanonical x * (N n) = (N n) * x
+toCanonical :: Expr -> Expr
+toCanonical (Mul (Add x1 Plus y1) Times (Add x2 Plus y2))   = (x1 .* x2) .+ (x1 .* y2) .+ (y1 .* x2) .+ (y1 .* y2)
+toCanonical (Mul (Add x1 Plus y1) Times (Add x2 Minus y2))  = (x1 .* x2) .- (x1 .* y2) .+ (y1 .* x2) .- (y1 .* y2)
+toCanonical (Mul (Add x1 Minus y1) Times (Add x2 Plus y2))  = (x1 .* x2) .+ (x1 .* y2) .- (y1 .* x2) .- (y1 .* y2)
+toCanonical (Mul (Add x1 Minus y1) Times (Add x2 Minus y2)) = (x1 .* x2) .- (x1 .* y2) .- (y1 .* x2) .+ (y1 .* y2)
+toCanonical (Mul (Add x Plus y) Times e)                    = (x .* e) .+ (y .* e)
+toCanonical (Mul (Add x Minus y) Times e)                   = (x .* e) .- (y .* e)
+toCanonical (Mul e Times (Add x Plus y))                    = (x .* e) .+ (y .* e)
+toCanonical (Mul e Times (Add x Minus y))                   = (x .* e) .- (y .* e)
+
+toCanonical (Mul e Times (N n)) = N n .* e
+toCanonical e = e
+
+simplify :: Expr -> Expr
+simplify (Add x Minus y) | x==y = N 0
+
+simplify (Add x _ (N 0)) = x
+simplify (Add (N 0) Plus x) = x
+simplify (Add (N 0) Minus x) = (N -1) .* x
+
+simplify (Add (Mul (N n) Times x1) Plus x2) | x1 == x2 = Mul (N (n + 1)) Times x1
+simplify (Add x1 Plus (Mul (N n) Times x2)) | x1 == x2 = Mul (N (n + 1)) Times x1
 
 -- findSimplest :: Expr -> [Rule] -> Expr
 -- findSimplest expr rules = head $ sortOn lengthOfExpr (findSimplestHelper ...)
 
 -- findSimplestHelper :: Int -> Int -> [Expr] -> [Rule] -> [Expr]
--- -- findSimplestHelper depth maxLength currentExpr rules = ...
+-- findSimplestHelper depth maxLength currentExpr rules = ...
 
 lengthOfExpr :: Expr -> Integer
 lengthOfExpr (Mul e1 _ e2)  = lengthOfExpr e1 * lengthOfExpr e2
 lengthOfExpr (Add e1 _ e2)  = lengthOfExpr e1 + lengthOfExpr e2
-lengthOfExpr (Pow e1 e2)    = lengthOfExpr e1 + lengthOfExpr e2 -- TODO: review this decision
+lengthOfExpr (Pow e1 e2)    = lengthOfExpr e1
 lengthOfExpr _              = 1
 
 -- TODO: QuickCheck properties
 --    How do we know if a simplification is valid?
 --    How do we know that the simplest form really has been found?
+--
+--    Generate sets of integers values for x, y, etc, and check if they satisfy the assumptions.
+--    Then test if the expressions are equal if evaluated for these x, y, etc.
 --
 -- Bodge: Examples
 x = V $ Var "x"
