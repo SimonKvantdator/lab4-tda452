@@ -52,10 +52,10 @@ instance Show Expr where
     show (Add x1 Minus x2@(Add _ Minus _))  = show x1 ++ " - (" ++ show x2 ++ ")"
     show (Add x1 Minus x2)                  = show x1 ++ " - " ++ show x2
 
-    show (Mul x1@Add{} Times x2@Add{})      = "(" ++ show x1 ++ ") * (" ++ show x2 ++ ")"
-    show (Mul x1@Add{} Times x2)            = "(" ++ show x1 ++ ") * " ++ show x2
-    show (Mul x1 Times x2@Add{})            = show x1 ++ " * (" ++ show x2 ++ ")"
-    show (Mul x1 Times x2)                  = show x1 ++ " * " ++ show x2
+    show (Mul x1@Add{} Times x2@Add{})      = "(" ++ show x1 ++ ")*(" ++ show x2 ++ ")"
+    show (Mul x1@Add{} Times x2)            = "(" ++ show x1 ++ ")*" ++ show x2
+    show (Mul x1 Times x2@Add{})            = show x1 ++ "*(" ++ show x2 ++ ")"
+    show (Mul x1 Times x2)                  = show x1 ++ "*" ++ show x2
 
     show (Mul x1@Add{} Div x2@Add{})        = "(" ++ show x1 ++ ") / (" ++ show x2 ++ ")"
     show (Mul x1@Add{} Div x2)              = "(" ++ show x1 ++ ") / " ++ show x2
@@ -97,27 +97,25 @@ applyRule r e               = e
 -- applyRules rs (V x) = fromMaybe (V x) (lookup x rs)
 
 toCanonical :: Expr -> Expr
-toCanonical (Mul (Add x1 Plus y1) Times (Add x2 Plus y2))   = (x1 .* x2) .+ (x1 .* y2) .+ (y1 .* x2) .+ (y1 .* y2)
-toCanonical (Mul (Add x1 Plus y1) Times (Add x2 Minus y2))  = (x1 .* x2) .- (x1 .* y2) .+ (y1 .* x2) .- (y1 .* y2)
-toCanonical (Mul (Add x1 Minus y1) Times (Add x2 Plus y2))  = (x1 .* x2) .+ (x1 .* y2) .- (y1 .* x2) .- (y1 .* y2)
-toCanonical (Mul (Add x1 Minus y1) Times (Add x2 Minus y2)) = (x1 .* x2) .- (x1 .* y2) .- (y1 .* x2) .+ (y1 .* y2)
-toCanonical (Mul (Add x Plus y) Times e)                    = (x .* e) .+ (y .* e)
-toCanonical (Mul (Add x Minus y) Times e)                   = (x .* e) .- (y .* e)
-toCanonical (Mul e Times (Add x Plus y))                    = (x .* e) .+ (y .* e)
-toCanonical (Mul e Times (Add x Minus y))                   = (x .* e) .- (y .* e)
+toCanonical (Mul (Add x1 Plus y1) Times (Add x2 Plus y2))   = toCanonical (x1 .* x2) .+ toCanonical (x1 .* y2) .+ toCanonical (y1 .* x2) .+ toCanonical (y1 .* y2)
+toCanonical (Mul (Add x1 Plus y1) Times (Add x2 Minus y2))  = toCanonical (x1 .* x2) .- toCanonical (x1 .* y2) .+ toCanonical (y1 .* x2) .- toCanonical (y1 .* y2)
+toCanonical (Mul (Add x1 Minus y1) Times (Add x2 Plus y2))  = toCanonical (x1 .* x2) .+ toCanonical (x1 .* y2) .- toCanonical (y1 .* x2) .- toCanonical (y1 .* y2)
+toCanonical (Mul (Add x1 Minus y1) Times (Add x2 Minus y2)) = toCanonical (x1 .* x2) .- toCanonical (x1 .* y2) .- toCanonical (y1 .* x2) .+ toCanonical (y1 .* y2)
+toCanonical (Mul (Add x Plus y) Times e)                    = toCanonical (x .* e) .+ toCanonical (y .* e)
+toCanonical (Mul (Add x Minus y) Times e)                   = toCanonical (x .* e) .- toCanonical (y .* e)
+toCanonical (Mul e Times (Add x Plus y))                    = toCanonical (x .* e) .+ toCanonical (y .* e)
+toCanonical (Mul e Times (Add x Minus y))                   = toCanonical (x .* e) .- toCanonical (y .* e)
 
 toCanonical (Mul e Times (N n)) = N n .* e
 toCanonical e = e
 
-simplify :: Expr -> Expr
-simplify (Add x Minus y) | x==y = N 0
 
-simplify (Add x _ (N 0)) = x
-simplify (Add (N 0) Plus x) = x
-simplify (Add (N 0) Minus x) = (N -1) .* x
-
-simplify (Add (Mul (N n) Times x1) Plus x2) | x1 == x2 = Mul (N (n + 1)) Times x1
-simplify (Add x1 Plus (Mul (N n) Times x2)) | x1 == x2 = Mul (N (n + 1)) Times x1
+-- simplify :: Expr -> Expr
+-- simplify (Add (V x) Minus (V y)) | x == y = N 0
+-- simplify (Add x _ (N 0)) = x
+-- simplify (Add (N 0) Plus x) = x
+-- simplify (Add (Mul (N n) Times x1) Plus x2) | x1 == x2 = Mul (N (n + 1)) Times x1
+-- simplify (Add x1 Plus (Mul (N n) Times x2)) | x1 == x2 = Mul (N (n + 1)) Times x1
 
 -- findSimplest :: Expr -> [Rule] -> Expr
 -- findSimplest expr rules = head $ sortOn lengthOfExpr (findSimplestHelper ...)
@@ -145,3 +143,4 @@ z = V $ Var "z"
 a = x
 b = x .+ z
 c = (x .+ y .+ z).^(x .+ y)
+d = (x .+ y .+ z).*(x .+ y)
