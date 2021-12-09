@@ -6,6 +6,7 @@
 -- terminalen. Printa sen LaTeXkod för det förenklade uttrycket.
 
 import Data.Maybe
+import Data.List
 
 
 newtype Variable = Var String
@@ -21,25 +22,36 @@ data Expr =
     | Mul [Expr]
     | Pow Expr Expr
 
+-- TODO: describe this operator
+emap :: (Expr -> Expr) -> Expr -> Expr
+emap f (Add ts) = Add $ map f ts
+emap f (Mul fs) = Mul $ map f fs
+emap f (Pow e1 e2) = Pow (f e1) (f e2)
+emap f e = f e
+(<$$>) = emap
+infixr 4 <$$>
 
-infixl 6 .+
+-- TODO: how to deal with empty Adds and Muls?
+-- Does it make sense to simplify Add [] to 0 and Mul [] to 1?
+
 (.+) :: Expr -> Expr -> Expr
 x .+ y = Add [x, y]
+infixl 6 .+
 
-infixl 6 .*
 (.*) :: Expr -> Expr -> Expr
 x .* y = Mul [x, y]
+infixl 6 .*
 
-infixl 6 .-
 (.-) :: Expr -> Expr -> Expr
 x .- y = Add [x, N (-1) .* y]
+infixl 6 .-
 
 -- (./) :: Expr -> Expr -> Expr
 -- x ./ y = TODO
 
-infixr 8 .^
 (.^) :: Expr -> Expr -> Expr
 (.^) = Pow
+infixr 8 .^
 
 -- TODO: make minus look nice
 instance Show Expr where
@@ -68,6 +80,13 @@ instance Show Expr where
 
     show (Pow x1 x2)        = "(" ++ show x1 ++ ")^(" ++ show x2 ++ ")"
 
+-- More verbose show
+show' :: Expr -> String
+show' (V (Var s))   = s
+show' (N n)         = show n
+show' (Add ts)      = "Add [" ++ foldl (\x y -> x ++ "," ++ y) (show' $ head ts) (show' <$> tail ts) ++ "]"
+show' (Mul fs)      = "Mul [" ++ foldl (\x y -> x ++ "," ++ y) (show' $ head fs) (show' <$> tail fs) ++ "]"
+show' (Pow x y)     = "Pow (" ++ show' x ++ ") (" ++ show' y ++ ")"
 
 type Rule = (Variable, Expr)
 
@@ -77,27 +96,91 @@ rule1 :: Rule
 rule1 = (Var "x", Mul [N 2, y])
 
 
+-- applyRule :: Rule -> Expr -> Expr
+-- applyRule (x, e) (V y) | x == y  = e
+-- applyRule r (Add ts)             = Add (applyRule r <$> ts)
+-- applyRule r (Mul fs)             = Mul (applyRule r <$> fs)
+-- applyRule r (Pow e1 e2)          = Pow (applyRule r e1) (applyRule r e2)
+-- applyRule r e                    = e
+--
 applyRule :: Rule -> Expr -> Expr
 applyRule (x, e) (V y) | x == y  = e
-applyRule r (Add ts)             = Add (applyRule r <$> ts)
-applyRule r (Mul fs)             = Mul (applyRule r <$> fs)
-applyRule r (Pow e1 e2)          = Pow (applyRule r e1) (applyRule r e2)
-applyRule r e                    = e
+applyRule r e             = applyRule r <$$> e
 
 ---- applyRules :: [Rule] -> Expr -> Expr
 ---- applyRules rs (V x) = fromMaybe (V x) (lookup x rs)
 
--- flattenMuls :: Expr -> Expr
--- flattenAdds :: Expr -> Expr
--- sortMuls :: Expr -> Expr
--- sortAdds :: Expr -> Expr
--- sortFun (V Var s) = s
--- sortFun (N n) = show n
+-- TODO: make expression instance of applicative?
+flattenAdd :: Expr -> Expr
+flattenAdd e
+    | isAdd e   = flattenAddSingle $ Add $ flattenAdd <$> unpackAdd e
+    | isMul e   = Mul $ flattenAdd <$> unpackMul e
+    | otherwise = e
+    where
+        flattenAddSingle (Add ts)   = Add $ concat $ [t | t <- ts, not $ isAdd t]:[unpackAdd t | t <- ts, isAdd t]
+        flattenAddSingle e          = e
 
-toCanonical :: Expr -> Expr
-toCanonical (Mul (Add ts:fs))   = Add $ toCanonical <$> [Mul (t:fs) | t <- ts]
-toCanonical (Mul (f:Add ts:fs)) = Add $ toCanonical <$> [Mul (f:t:fs) | t <- ts]
-toCanonical e = e
+flattenMul :: Expr -> Expr
+flattenMul e
+    | isAdd e   = Add $ flattenMul <$> unpackAdd e
+    | isMul e   = flattenMulSingle $ Mul $ flattenMul <$> unpackMul e
+    | otherwise = e
+    where
+        flattenMulSingle (Mul fs)   = Mul $ concat $ [f | f <- fs, not $ isMul f]:[unpackMul f | f <- fs, isMul f]
+        flattenMulSingle e          = e
+
+isAdd :: Expr -> Bool
+isAdd (Add _)   = True
+isAdd _         = False
+
+unpackAdd :: Expr -> [Expr]
+unpackAdd (Add ts) = ts
+
+isMul :: Expr -> Bool
+isMul (Mul _)   = True
+isMul _         = False
+
+unpackMul :: Expr -> [Expr]
+unpackMul (Mul fs) = fs
+
+sortExpr :: Expr -> Expr
+sortExpr (Add ts)   = Add $ sortExpr <$> sortBy sortFun ts
+sortExpr (Mul fs)   = Mul $ sortExpr <$> sortBy sortFun fs
+sortExpr e          = e
+
+-- TODO: create a strict ordering
+sortFun :: Expr -> Expr -> Ordering
+sortFun e1 e2 = show e1 `compare` show e2
+
+-- -- TODO: do this without appending to end?
+-- expand :: Expr -> Expr
+-- expand (Mul fs)     = flattenAdd $ flattenMul $ expandHelper $ flattenAdd $ flattenMul e'
+--     where
+--     -- Put the factors with addition first
+--     e' = Mul $ [f | f <- fs, isAdd f] ++ [f | f <- fs, not $ isAdd f]
+--     expandHelper (Mul (Add ts:fs))  = Add $ expandHelper <$> [Mul (fs ++ [t]) | t <- ts]
+--     expandHelper e                  = e
+-- expand (Add ts)     = Add $ expand <$> ts
+-- expand (Pow e1 e2)  = Pow (expand e1) (expand e2)
+-- expand e            = e
+
+-- TODO: do this without appending to end?
+expand :: Expr -> Expr
+expand e     
+    | isMul e = flattenMul $ flattenAdd $ expandHelper [] fs
+    where
+    fs = unpackMul $ flattenMul $ flattenAdd e
+    -- expandHelper takes an initial list and a list of factors and returns an expansion
+    expandHelper :: [Expr] -> [Expr] -> Expr
+    expandHelper gs (Add ts:fs) = Add [expandHelper (t:gs) fs | t <- ts]
+    expandHelper gs (f:fs)      = expandHelper (f:gs) fs
+    expandHelper gs []          = Mul gs
+expand (Add ts)     = Add $ expand <$> ts
+expand (Pow e1 e2)  = Pow (expand e1) (expand e2)
+expand e            = e
+
+
+-- toCanonical :: Expr -> Expr
 
 
 ---- simplify :: Expr -> Expr
@@ -115,7 +198,7 @@ toCanonical e = e
 
 lengthOfExpr :: Expr -> Integer
 lengthOfExpr (Add ts)       = sum $ lengthOfExpr <$> ts
-lengthOfExpr (Mul fs)       = prod $ lengthOfExpr <$> fs
+lengthOfExpr (Mul fs)       = product $ lengthOfExpr <$> fs
 lengthOfExpr (Pow e1 e2)    = lengthOfExpr e1
 lengthOfExpr _              = 1
 
@@ -134,3 +217,5 @@ a = x
 b = N 1 .+ (N (-2) .* x) .+ z
 c = (x .+ y .+ z).^(x .+ y)
 d = (x .+ y .+ z).*(x .+ y)
+e = y .+ (z .+ x)
+f = (x .+ y) .* (y .+ z) .* (x .+ z)
