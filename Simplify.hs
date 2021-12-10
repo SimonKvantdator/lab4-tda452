@@ -1,9 +1,14 @@
-
 -- Emma Sofia Ringström & Simon Stefanus Jacobsson
 -- Grunduppgift: Skriv en simplifyer som kan förenkla ett uttryck givet en
 -- mängd samband för variablerna som uttrycket består av.
 -- Bonusuppgift: Skriv en parser så att man kan mata in uttryck och samband i
 -- terminalen. Printa sen LaTeXkod för det förenklade uttrycket.
+
+module Simplify
+( simplify
+, expand
+, sortExpr
+) where  
 
 import Data.Maybe
 import Data.List
@@ -21,6 +26,28 @@ data Expr =
     | Add [Expr]
     | Mul [Expr]
     | Pow Expr Expr
+
+isAdd :: Expr -> Bool
+isAdd (Add _)   = True
+isAdd _         = False
+
+unpackAdd :: Expr -> [Expr]
+unpackAdd (Add ts) = ts
+
+isMul :: Expr -> Bool
+isMul (Mul _)   = True
+isMul _         = False
+
+unpackMul :: Expr -> [Expr]
+unpackMul (Mul fs) = fs
+
+isVariable :: Expr -> Bool
+isVariable (V _) = True
+isVariable  _ = False
+
+isNumeric :: Expr -> Bool
+isNumeric (N _) = True
+isNumeric _ = False
 
 -- TODO: describe this operator
 emap :: (Expr -> Expr) -> Expr -> Expr
@@ -95,7 +122,6 @@ type Rule = (Variable, Expr)
 rule1 :: Rule
 rule1 = (Var "x", Mul [N 2, y])
 
-
 -- applyRule :: Rule -> Expr -> Expr
 -- applyRule (x, e) (V y) | x == y  = e
 -- applyRule r (Add ts)             = Add (applyRule r <$> ts)
@@ -104,44 +130,12 @@ rule1 = (Var "x", Mul [N 2, y])
 -- applyRule r e                    = e
 --
 applyRule :: Rule -> Expr -> Expr
-applyRule (x, e) (V y) | x == y  = e
-applyRule r e             = applyRule r <$$> e
+applyRule (x, e) (V y) | x == y = e
+applyRule _ (N n)               = N n
+applyRule r e                   = applyRule r <$$> e
 
 ---- applyRules :: [Rule] -> Expr -> Expr
 ---- applyRules rs (V x) = fromMaybe (V x) (lookup x rs)
-
--- TODO: make expression instance of applicative?
-flattenAdd :: Expr -> Expr
-flattenAdd e
-    | isAdd e   = flattenAddSingle $ Add $ flattenAdd <$> unpackAdd e
-    | isMul e   = Mul $ flattenAdd <$> unpackMul e
-    | otherwise = e
-    where
-        flattenAddSingle (Add ts)   = Add $ concat $ [t | t <- ts, not $ isAdd t]:[unpackAdd t | t <- ts, isAdd t]
-        flattenAddSingle e          = e
-
-flattenMul :: Expr -> Expr
-flattenMul e
-    | isAdd e   = Add $ flattenMul <$> unpackAdd e
-    | isMul e   = flattenMulSingle $ Mul $ flattenMul <$> unpackMul e
-    | otherwise = e
-    where
-        flattenMulSingle (Mul fs)   = Mul $ concat $ [f | f <- fs, not $ isMul f]:[unpackMul f | f <- fs, isMul f]
-        flattenMulSingle e          = e
-
-isAdd :: Expr -> Bool
-isAdd (Add _)   = True
-isAdd _         = False
-
-unpackAdd :: Expr -> [Expr]
-unpackAdd (Add ts) = ts
-
-isMul :: Expr -> Bool
-isMul (Mul _)   = True
-isMul _         = False
-
-unpackMul :: Expr -> [Expr]
-unpackMul (Mul fs) = fs
 
 sortExpr :: Expr -> Expr
 sortExpr (Add ts)   = Add $ sortExpr <$> sortBy sortFun ts
@@ -164,10 +158,34 @@ sortFun e1 e2 = show e1 `compare` show e2
 -- expand (Pow e1 e2)  = Pow (expand e1) (expand e2)
 -- expand e            = e
 
+-- TODO: make expression instance of applicative?
+flattenAdd :: Expr -> Expr
+flattenAdd e
+    | isNumeric e   = e
+    | isVariable e  = e
+    | otherwise     = flattenAddSingle $ flattenAdd <$$> e
+    where
+    flattenAddSingle (Add ts)   =
+        Add $ concat $ [t | t <- ts, not $ isAdd t]:[unpackAdd t | t <- ts, isAdd t]
+    flattenAddSingle e          = e
+
+flattenMul :: Expr -> Expr
+flattenMul e
+    | isNumeric e   = e
+    | isVariable e  = e
+    | otherwise     = flattenMulSingle $ flattenMul <$$> e
+    where
+    flattenMulSingle (Mul fs)   =
+        Mul $ concat $ [f | f <- fs, not $ isMul f]:[unpackMul f | f <- fs, isMul f]
+    flattenMulSingle e          = e
+
 -- TODO: do this without appending to end?
 expand :: Expr -> Expr
 expand e     
-    | isMul e = flattenMul $ flattenAdd $ expandHelper [] fs
+    | isNumeric e   = e
+    | isVariable e  = e
+    | isMul e       = flattenMul $ flattenAdd $ expandHelper [] fs
+    | otherwise     = expand <$$> e
     where
     fs = unpackMul $ flattenMul $ flattenAdd e
     -- expandHelper takes an initial list and a list of factors and returns an expansion
@@ -175,9 +193,6 @@ expand e
     expandHelper gs (Add ts:fs) = Add [expandHelper (t:gs) fs | t <- ts]
     expandHelper gs (f:fs)      = expandHelper (f:gs) fs
     expandHelper gs []          = Mul gs
-expand (Add ts)     = Add $ expand <$> ts
-expand (Pow e1 e2)  = Pow (expand e1) (expand e2)
-expand e            = e
 
 
 -- toCanonical :: Expr -> Expr
