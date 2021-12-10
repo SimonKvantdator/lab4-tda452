@@ -5,7 +5,7 @@
 -- terminalen. Printa sen LaTeXkod för det förenklade uttrycket.
 
 module Simplify
-( simplify
+( toCanonical
 , expand
 , sortExpr
 ) where  
@@ -137,14 +137,56 @@ applyRule r e                   = applyRule r <$$> e
 ---- applyRules :: [Rule] -> Expr -> Expr
 ---- applyRules rs (V x) = fromMaybe (V x) (lookup x rs)
 
-sortExpr :: Expr -> Expr
-sortExpr (Add ts)   = Add $ sortExpr <$> sortBy sortFun ts
-sortExpr (Mul fs)   = Mul $ sortExpr <$> sortBy sortFun fs
-sortExpr e          = e
+-- -- TODO: can I use emap?
+-- sortExpr :: Expr -> Expr
+-- sortExpr (Add ts)   = Add $ sortExpr <$> sortBy sortFun ts
+-- sortExpr (Mul fs)   = Mul $ sortExpr <$> sortBy sortFun fs
+-- sortExpr e          = e
 
--- TODO: create a strict ordering
-sortFun :: Expr -> Expr -> Ordering
-sortFun e1 e2 = show e1 `compare` show e2
+-- -- TODO: create a strict ordering
+-- sortFun :: Expr -> Expr -> Ordering
+-- sortFun e1 e2 = show e1 `compare` show e2
+
+sortExpr :: Expr -> Expr
+sortExpr e = case expand e of
+    Add es      -> Add $ sortTerms $ map sortExpr es
+    Mul es      -> Mul $ sortTerms $ map sortExpr es
+    Pow e1 e2   -> Pow (sortExpr e1) (sortExpr e2)
+    e           -> e
+
+sortTerms :: [Expr] -> [Expr]
+sortTerms = sortBy comp
+
+
+comp :: Expr -> Expr -> Ordering
+comp (N n) (N s)                                                         = compare n s
+comp (N n) _                                                             = LT
+comp _ (N n)                                                             = GT
+
+comp (Pow e1 e2) (Pow e3 e4) | comp e1 e3 == LT                          = LT
+                                | comp e1 e3 == GT                          = GT
+                                | otherwise                                 = comp e2 e4
+comp (Pow _ _) _                                                         = GT
+comp _ (Pow _ _)                                                         = LT
+
+comp (V (Var v)) (V (Var s))                                             = compare v s
+
+comp (Mul es1) (Mul es2)     | comp (head es1) (head es2) == LT          = LT
+                                | comp (head es1) (head es2) == GT          = GT
+                                | not (null (tail es1)) && not (null (tail es2))
+                                = comp (Mul $ tail es1) (Mul $ tail es2)
+                                | not (null (tail es1))                     = GT
+                                | not (null (tail es2))                     = LT
+comp (Mul es) _                                                          = GT
+comp _ (Mul es)                                                          = LT
+
+comp (Add es1) (Add es2)     | comp (head es1) (head es2) == LT          = LT
+                                | comp (head es1) (head es2) == GT          = GT
+                                | not (null (tail es1)) && not (null (tail es2))
+                                = comp (Add $ tail es1) (Add $ tail es2)
+                                | not (null (tail es1))                     = GT
+                                | not (null (tail es2))                     = LT
+
 
 -- -- TODO: do this without appending to end?
 -- expand :: Expr -> Expr
@@ -196,14 +238,49 @@ expand e
 
 
 -- toCanonical :: Expr -> Expr
+toCanonical :: Expr -> Expr
+toCanonical = sortExpr . toCanonical' . sortExpr
 
+toCanonical' :: Expr -> Expr
+toCanonical' (Mul [e])    = e
+toCanonical' (Mul (e:es)) = case (e,head es) of
+    (N 0, e)              -> N 0
+    (e, N 0)              -> N 0
+    (N 1, e)              -> Mul $ e:[toCanonical' (Mul $ tail es)]
+    (e, N 1)              -> Mul $ e:[toCanonical' (Mul $ tail es)]
+    (N n, N s)            -> toCanonical' (Mul $ N (n + s):tail es)
+    (V (Var x), V (Var y)) | x == y
+                          -> toCanonical' (Mul $ Pow (V (Var x)) (N 2):tail es)
+    (Pow (V (Var x)) n, V (Var y)) | x == y
+                          -> toCanonical' (Mul $ Pow (V (Var x)) (toCanonical' (n .+ N 1)):tail es)
+    (V (Var x), Pow (V (Var y)) n) | x == y
+                          -> toCanonical' (Mul $ Pow (V (Var y)) (toCanonical' (n .+ N 1)):tail es)
+    (Pow (V (Var x)) s, Pow (V(Var y)) n) | x == y
+                          -> toCanonical' (Mul $ Pow (V (Var x)) (toCanonical' (s .+ n)):tail es)
+    (e,_)                 -> Mul $ e:[toCanonical' (Mul es)]
 
----- simplify :: Expr -> Expr
----- simplify (Add (V x) Minus (V y)) | x == y = N 0
----- simplify (Add x _ (N 0)) = x
----- simplify (Add (N 0) Plus x) = x
----- simplify (Add (Mul (N n) Times x1) Plus x2) | x1 == x2 = Mul (N (n + 1)) Times x1
----- simplify (Add x1 Plus (Mul (N n) Times x2)) | x1 == x2 = Mul (N (n + 1)) Times x1
+toCanonical' (Add [e])    = e
+toCanonical' (Add (e:es)) = case (e,head es) of
+    (N 0, e)                            -> toCanonical' (Add $ e:tail es)
+    (e, N 0)                            -> toCanonical' (Add $ e:tail es)
+    (N n, N s)                          -> toCanonical' (Add $ N (n + s):tail es)
+    (V (Var x), V (Var y)) | x == y
+                                        -> toCanonical' (Add $ Mul [N 2, V (Var x)]:tail es)
+    (e1, e2) | comp e1 e2 == EQ         -> toCanonical' (Add $ Mul [N 2, e1]:tail es)
+    (Mul [N n, e1], Mul [N s, e2]) | comp e1 e2 == EQ     
+                                        -> toCanonical' (Add $ Mul [N (n+s), e1]:tail es)
+    (Mul [N n, e1], e) | comp e1 e == EQ                 
+                                        -> toCanonical' (Add $ Mul [N (n+1), e1]:tail es)
+    (e, Mul [N s, e2]) | comp e e2 == EQ                   
+                                        -> toCanonical' (Add $ Mul [N (s+1), e2]:tail es)
+    (e,_)                               -> Add $ toCanonical' e:[toCanonical' (Add $ map toCanonical' es)]
+
+toCanonical' (Pow (N 0) e) = N 0
+toCanonical' (Pow (N 1) e) = N 1
+toCanonical' (Pow e (N 0)) = N 1
+toCanonical' (Pow e (N 1)) = e
+
+toCanonical' e = e
 
 ---- findSimplest :: Expr -> [Rule] -> Expr
 ---- findSimplest expr rules = head $ sortOn lengthOfExpr (findSimplestHelper ...)
@@ -234,3 +311,4 @@ c = (x .+ y .+ z).^(x .+ y)
 d = (x .+ y .+ z).*(x .+ y)
 e = y .+ (z .+ x)
 f = (x .+ y) .* (y .+ z) .* (x .+ z)
+g = N 1 .* x .* x.* y.* N 2
