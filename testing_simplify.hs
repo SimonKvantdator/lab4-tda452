@@ -18,7 +18,7 @@ eval env (N n)   = n
 eval env (V x)   = fromJust $ lookup x env
 eval env (Add ts) = sum $ eval env <$> ts
 eval env (Mul fs) = product $ eval env <$> fs
-eval env (Pow e1 e2) = (eval env e1)^(eval env e2)
+eval env (Pow e1 e2) = eval env e1 ^ eval env e2
  
 instance Arbitrary Variable
     where

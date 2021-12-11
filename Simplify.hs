@@ -147,7 +147,7 @@ instance Eq Expr
 
 instance Ord Expr
     where
-    compare = comp'
+    compare = comp
 
 --type Rule = (Variable, Expr)
 
@@ -163,15 +163,15 @@ sortExpr e = case expand e of
 sortTerms :: [Expr] -> [Expr]
 sortTerms = sortBy comp
 
-comp :: Expr -> Expr -> Ordering
-comp e1 e2 = compare (show e1) (show e2)
+--comp :: Expr -> Expr -> Ordering
+--comp e1 e2 = compare (show e1) (show e2)
 
-{--comp :: Expr -> Expr -> Ordering
+comp :: Expr -> Expr -> Ordering
 comp (N n) (N s)                                                         = compare n s
 comp (N n) _                                                             = LT
 comp _ (N n)                                                             = GT
 
-comp (Pow e1 e2) (Pow e3 e4) | comp e1 e3 == LT                          = LT
+{-comp (Pow e1 e2) (Pow e3 e4) | comp e1 e3 == LT                          = LT
                              | comp e1 e3 == GT                          = GT
                              | otherwise                                 = comp e2 e4
 comp (Pow _ _) _                                                         = GT
@@ -196,7 +196,7 @@ comp (Add es1) (Add es2)     | comp (head es1) (head es2) == LT          = LT
                                 | not (null (tail es1))                     = GT
                                 | not (null (tail es2))                     = LT-}
 
-comp' e1 e2 = compare (show e1) (show e2)
+comp e1 e2 = compare (show e1) (show e2)
 
 
 -- TODO: make expression instance of applicative?
@@ -276,7 +276,6 @@ combineTerms e
             ):ts
         | otherwise = t1 .+ combineTermsHelper (t2:ts)
     combineTermsHelper [t] = t
-    --combineTermsHelper [] = 
 
 
 removeMulBy0 :: Expr -> Expr
@@ -367,7 +366,6 @@ findSimplest e rs = minimumBy (compare `on` lengthOfExpr) $ map toCanonical (fin
         findSimplest' e [] = []
         findSimplest' e rss = e:applyRules (head rss) e:findSimplest' e (tail rss)
 
---e, e_r1, e_r2, ..., e_rn, e_r1r2, e_r1r3, ..., e_rnr(n-1)...r1
 
  --findSimplest expr rules = head $ sortOn lengthOfExpr (findSimplestHelper ...)
 
@@ -377,7 +375,7 @@ findSimplest e rs = minimumBy (compare `on` lengthOfExpr) $ map toCanonical (fin
 lengthOfExpr :: Expr -> Integer
 lengthOfExpr (Add ts)       = sum $ lengthOfExpr <$> ts
 lengthOfExpr (Mul fs)       = product $ lengthOfExpr <$> fs
-lengthOfExpr (Pow e1 e2)    = 1 --lengthOfExpr e1
+--lengthOfExpr (Pow e1 e2)    = 1 --lengthOfExpr e1
 lengthOfExpr _              = 1
 
 ---- TODO: QuickCheck properties
@@ -399,6 +397,7 @@ toLatex (Pow e1@(N n) e2) = toLatex e1 ++ " ^{ " ++ toLatex e2 ++ " }"
 toLatex (Pow e1 e2) = "(" ++ toLatex e1 ++ ")" ++ " ^{ " ++ toLatex e2 ++ " }"
 toLatex (V (Var x)) = x
 toLatex (N n) = show n
+toLatex _ = ""
 
 
 printLatex :: Expr -> IO()
