@@ -17,10 +17,11 @@ module Simplify
 , sortExpr
 , combineTerms
 , show' -- bodge
-) where  
+) where
 
 import Data.Maybe
 import Data.List
+import Data.Function (on)
 
 
 newtype Variable = Var String
@@ -35,6 +36,8 @@ data Expr =
     | Add [Expr]
     | Mul [Expr]
     | Pow Expr Expr
+
+type Rule = (Variable, Expr)
 
 -- Smart constructors
 add = flattenAdd . Add
@@ -142,7 +145,7 @@ instance Ord Expr
     where
     compare = comp'
 
-type Rule = (Variable, Expr)
+--type Rule = (Variable, Expr)
 
 -- generateMoreRules [x = y / z] = [x = y / z, y = x / z, z = y / x]
 
@@ -157,6 +160,9 @@ sortTerms :: [Expr] -> [Expr]
 sortTerms = sortBy comp
 
 comp :: Expr -> Expr -> Ordering
+comp e1 e2 = compare (show e1) (show e2)
+
+{--comp :: Expr -> Expr -> Ordering
 comp (N n) (N s)                                                         = compare n s
 comp (N n) _                                                             = LT
 comp _ (N n)                                                             = GT
@@ -170,9 +176,6 @@ comp _ (Pow _ _)                                                         = LT
 comp (V (Var v)) (V (Var s))                                             = compare v s
 
 comp (Mul es1) (Mul es2)     
-    -- | (isNumeric $ head es1) && (isNumeric $ head es2) && (comp (Mul $ tail es1) (Mul $ tail es2) == EQ) = EQ
-    -- | (isNumeric $ head es1) && (comp (Mul $ tail es1) (Mul es2)) == EQ = EQ
-    -- | (isNumeric $ head es2) && (comp (Mul es1) (Mul $ tail es2)) == EQ = EQ
     | comp (head es1) (head es2) == LT          = LT
     | comp (head es1) (head es2) == GT          = GT
     | not (null (tail es1)) && not (null (tail es2))
@@ -187,7 +190,7 @@ comp (Add es1) (Add es2)     | comp (head es1) (head es2) == LT          = LT
                                 | not (null (tail es1)) && not (null (tail es2))
                                 = comp (Add $ tail es1) (Add $ tail es2)
                                 | not (null (tail es1))                     = GT
-                                | not (null (tail es2))                     = LT
+                                | not (null (tail es2))                     = LT-}
 
 comp' e1 e2 = compare (show e1) (show e2)
 
@@ -216,7 +219,7 @@ flattenMul e
 expand :: Expr -> Expr
 expand = flattenAdd . flattenMul . expandHelper1 . flattenAdd . flattenMul
     where
-    expandHelper1 e     
+    expandHelper1 e
         | isNumeric e   = e
         | isVariable e  = e
         | isMul e       = expandHelper2 [] $ fromMul e
@@ -232,7 +235,7 @@ combineNumsInMul e
     | isNumeric e   = e
     | isVariable e  = Mul[N 1, e]
     | isMul e       = Mul $
-        (N $ product [fromNumeric n | n <- fs, isNumeric n])
+        N (product [fromNumeric n | n <- fs, isNumeric n])
         :[f | f <- fs, not $ isNumeric f]
     | otherwise     = combineNumsInMul <$$> e
     where
@@ -269,6 +272,7 @@ combineTerms e
             ):ts
         | otherwise = t1 .+ combineTermsHelper (t2:ts)
     combineTermsHelper [t] = t
+    --combineTermsHelper [] = 
 
 
 removeMulBy0 :: Expr -> Expr
@@ -340,8 +344,28 @@ toCanonical = removeAdd0 . removeMulBy1 . removeMulBy0 . sortExpr .
 
 -- toCanonical' e = e
 
----- findSimplest :: Expr -> [Rule] -> Expr
----- findSimplest expr rules = head $ sortOn lengthOfExpr (findSimplestHelper ...)
+applyRule :: Rule -> Expr -> Expr
+applyRule (x, e) (V y) | x == y  = e
+applyRule r (Add ts)             = Add (applyRule r <$> ts)
+applyRule r (Mul fs)             = Mul (applyRule r <$> fs)
+applyRule r (Pow e1 e2)          = Pow (applyRule r e1) (applyRule r e2)
+applyRule r e                    = e
+
+-- applies a list of rules in order to an expression
+applyRules :: [Rule] -> Expr -> Expr
+applyRules [] e = e
+applyRules rs e = applyRules (tail rs) (applyRule (head rs) e)
+
+findSimplest :: Expr -> [Rule] -> Expr
+findSimplest e rs = minimumBy (compare `on` lengthOfExpr) $ map toCanonical (findSimplest' e (permutations rs))
+    where
+        findSimplest' :: Expr -> [[Rule]] -> [Expr]
+        findSimplest' e [] = []
+        findSimplest' e rss = e:applyRules (head rss) e:findSimplest' e (tail rss)
+
+--e, e_r1, e_r2, ..., e_rn, e_r1r2, e_r1r3, ..., e_rnr(n-1)...r1
+
+ --findSimplest expr rules = head $ sortOn lengthOfExpr (findSimplestHelper ...)
 
 ---- findSimplestHelper :: Int -> Int -> [Expr] -> [Rule] -> [Expr]
 ---- findSimplestHelper depth maxLength currentExpr rules = ...
@@ -349,7 +373,7 @@ toCanonical = removeAdd0 . removeMulBy1 . removeMulBy0 . sortExpr .
 lengthOfExpr :: Expr -> Integer
 lengthOfExpr (Add ts)       = sum $ lengthOfExpr <$> ts
 lengthOfExpr (Mul fs)       = product $ lengthOfExpr <$> fs
-lengthOfExpr (Pow e1 e2)    = lengthOfExpr e1
+lengthOfExpr (Pow e1 e2)    = 1 --lengthOfExpr e1
 lengthOfExpr _              = 1
 
 ---- TODO: QuickCheck properties
@@ -360,6 +384,22 @@ lengthOfExpr _              = 1
 ----    Then test if the expressions are equal if evaluated for these x, y, etc.
 ----
 ---- Bodge: Examples
+
+toLatex :: Expr -> String
+toLatex (Add [e]) = toLatex e
+toLatex (Add (e:es)) = toLatex e ++ " + " ++ toLatex (Add es)
+toLatex (Mul [e]) = toLatex e
+toLatex (Mul (e:es)) = toLatex e ++  toLatex (Mul es)
+toLatex (Pow e1@(V (Var x)) e2) = toLatex e1 ++ " ^{ " ++ toLatex e2 ++ " }"
+toLatex (Pow e1@(N n) e2) = toLatex e1 ++ " ^{ " ++ toLatex e2 ++ " }"
+toLatex (Pow e1 e2) = "(" ++ toLatex e1 ++ ")" ++ " ^{ " ++ toLatex e2 ++ " }"
+toLatex (V (Var x)) = x
+toLatex (N n) = show n
+
+
+printLatex :: Expr -> IO()
+printLatex e = putStrLn $ "$" ++ toLatex e ++ "$"
+
 x = V $ Var "x"
 y = V $ Var "y"
 z = V $ Var "z"
@@ -372,3 +412,7 @@ f = (x .+ y) .* (y .+ z) .* (x .+ z)
 g = N 1 .* x .* x.* y.* N 2
 h = ((x .* N 2) .^ x) .+ ((x .+ N 2 .+ z).*(x .+ y)) .+ (((x .* N 2) .^ x).* N 2)
 i = (N 3 .+ y) .* (N 8 .+ z) .* (N 4 .+ z)
+
+h' = Add [Pow (Mul [N 2,x]) x,Mul [Pow (Mul [N 2,x]) x,N 2],Mul [x,x],Mul [x,y],Mul [x,z],Mul [y,z],Mul [N 2,x],Mul [N 2,y]]
+
+ruleList = [(Var "x", Mul [N 2, V (Var "z")]),(Var "y", N 3),(Var "z",Mul [N 4, V (Var "z")])]
