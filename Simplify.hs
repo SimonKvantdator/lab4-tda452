@@ -6,7 +6,7 @@
 
 module Simplify
 ( Variable(..)
-, Expr(N, V, Pow)
+, Expr(..)
 , add
 , mul
 , (.+)
@@ -16,6 +16,7 @@ module Simplify
 , expand
 , sortExpr
 , combineTerms
+, applyRules
 , show' -- bodge
 ) where
 

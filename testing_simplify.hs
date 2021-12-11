@@ -1,5 +1,6 @@
 import Simplify
 import Data.Maybe
+import Test.QuickCheck
 
 -- | Gathering variables
 vars :: Expr -> [String]
@@ -8,20 +9,38 @@ vars (V x) = [show x]
 vars (Add ts) = concat $ vars <$> ts
 vars (Mul fs) = concat $ vars <$> fs
 
--- | Substituting expressions for variables
-substitute :: [(String, Expr)] -> Expr -> Expr
-substitute env (N n) = N n
-substitute env (V x) = fromJust $ lookup (show x) env
-substitute env (Add ts) = Add $ substitute env <$> ts
-substitute env (Mul fs) = Mul $ substitute env <$> fs
 
 -- | Evaluating Symbolic Expressions
-eval :: [(String,Integer)] -> Expr -> Integer
+type EvalRule = (Variable, Integer)
+
+eval :: [EvalRule] -> Expr -> Integer
 eval env (N n)   = n
-eval env (V x)   = fromJust $ lookup (show x) env
+eval env (V x)   = fromJust $ lookup x env
 eval env (Add ts) = sum $ eval env <$> ts
 eval env (Mul fs) = product $ eval env <$> fs
 eval env (Pow e1 e2) = (eval env e1)^(eval env e2)
+ 
+instance Arbitrary Variable
+    where
+    arbitrary = Var . (:[]) <$> choose ('t', 'z') -- TODO: how many variables should we have?
+
+instance Arbitrary Expr
+    where
+    arbitrary = rExpr
+
+rExpr :: Gen Expr
+rExpr = oneof $ rExprHelper <$> [1..6]
+    where
+    rExprHelper :: Integer -> Gen Expr
+    rExprHelper n | n < 0 = undefined
+    rExprHelper 0 = oneof [N <$> arbitrary, V <$> arbitrary]
+    rExprHelper n = oneof [
+        N <$> arbitrary,
+        V <$> arbitrary,
+        Add <$> listOf1 (rExprHelper (n - 1)),
+        Mul <$> listOf1 (rExprHelper (n - 1)),
+        Pow <$> rExprHelper (n - 1) <*> rExprHelper (n - 1)
+        ]
 
 ---- Bodge: Examples
 x = V $ Var "x"
