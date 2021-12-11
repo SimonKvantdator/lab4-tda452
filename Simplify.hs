@@ -7,6 +7,7 @@
 module Simplify
 ( Variable(..)
 , Expr(..)
+, Rule
 , add
 , mul
 , (.+)
@@ -114,6 +115,8 @@ instance Show Expr where
     show (Mul [Add ts])     = "(" ++ show (Add ts) ++ ")"
     show (Mul [f])          = show f
     show (Mul (Add ts:fs))  = "(" ++ show (Add ts) ++ ")*" ++ show (Mul fs)
+    show (Mul (N n:fs))    
+        | n < 0             = "(" ++ show n ++ ")*" ++ show (Mul fs) 
     show (Mul (f:fs))       = show f ++ "*" ++ show (Mul fs)
     show (Mul [])           = ""
 
