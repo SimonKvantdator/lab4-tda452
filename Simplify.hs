@@ -26,6 +26,7 @@ module Simplify where
 
 import Data.Maybe
 import Data.List
+import Data.List.Unique
 import Data.Function (on)
 
 
@@ -327,7 +328,7 @@ applyRules [] e = e
 applyRules rs e = applyRules (tail rs) (applyRule (head rs) e)
 
 findSimplest :: Expr -> [Rule] -> Expr
-findSimplest e rs = minimumBy (compare `on` lengthOfExpr) $ map toCanonical (findSimplest' e $ concatMap subsequences (permutations rs))
+findSimplest e rs = minimumBy (compare `on` lengthOfExpr) $ map toCanonical (findSimplest' e $ uniq $ concatMap subsequences (permutations rs))
     where
         findSimplest' :: Expr -> [[Rule]] -> [Expr]
         findSimplest' e [] = []
