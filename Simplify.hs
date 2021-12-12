@@ -4,22 +4,25 @@
 -- Bonusuppgift: Skriv en parser så att man kan mata in uttryck och samband i
 -- terminalen. Printa sen LaTeXkod för det förenklade uttrycket.
 
-module Simplify
-( Variable(..)
-, Expr(..)
-, Rule
-, add
-, mul
-, (.+)
-, (.*)
-, (.^)
-, toCanonical
-, expand
-, sortExpr
-, combineTerms
-, applyRules
-, show' -- bodge
-) where
+-- module Simplify
+-- ( Variable(..)
+-- , Expr(..)
+-- , Rule
+-- , add
+-- , mul
+-- , (.+)
+-- , (.*)
+-- , (.^)
+-- , toCanonical
+-- , expand
+-- , sortExpr
+-- , combineTerms
+-- , applyRules
+-- , show' -- bodge
+-- ) where
+
+-- bodge
+module Simplify where
 
 import Data.Maybe
 import Data.List
@@ -71,6 +74,10 @@ isNumeric _ = False
 
 fromNumeric :: Expr -> Integer
 fromNumeric (N n) = n
+
+isPow :: Expr -> Bool
+isPow (Pow _ _)   = True
+isPow _         = False
 
 -- TODO: describe this operator
 emap :: (Expr -> Expr) -> Expr -> Expr
@@ -134,8 +141,8 @@ instance Show Expr where
 
 -- More verbose show
 show' :: Expr -> String
-show' (V (Var s))   = s
-show' (N n)         = show n
+show' (V v)         = "V " ++ show v
+show' (N n)         = "N " ++ show n
 show' (Add ts)      = "Add [" ++ foldl (\x y -> x ++ "," ++ y) (show' $ head ts) (show' <$> tail ts) ++ "]"
 show' (Mul fs)      = "Mul [" ++ foldl (\x y -> x ++ "," ++ y) (show' $ head fs) (show' <$> tail fs) ++ "]"
 show' (Pow x y)     = "Pow (" ++ show' x ++ ") (" ++ show' y ++ ")"
@@ -147,31 +154,32 @@ instance Eq Expr
 
 instance Ord Expr
     where
-    compare = comp
+    compare = comp'
 
 --type Rule = (Variable, Expr)
 
 -- generateMoreRules [x = y / z] = [x = y / z, y = x / z, z = y / x]
 
 sortExpr :: Expr -> Expr
-sortExpr e = case expand e of
-    Add es      -> add $ sortTerms $ map sortExpr es
-    Mul es      -> mul $ sortTerms $ map sortExpr es
-    Pow e1 e2   -> Pow (sortExpr e1) (sortExpr e2)
-    e           -> e
+sortExpr e
+    | isNumeric e = e
+    | isVariable e = e
+    | isAdd e   = sortExpr <$$> Add (sortBy comp $ fromAdd e)
+    | isMul e   = sortExpr <$$> Mul (sortBy comp $ fromMul e)
+    | isPow e   = sortExpr <$$> e
 
 sortTerms :: [Expr] -> [Expr]
 sortTerms = sortBy comp
 
---comp :: Expr -> Expr -> Ordering
---comp e1 e2 = compare (show e1) (show e2)
-
 comp :: Expr -> Expr -> Ordering
+comp e1 e2 = compare (show e1) (show e2)
+
+{--comp :: Expr -> Expr -> Ordering
 comp (N n) (N s)                                                         = compare n s
 comp (N n) _                                                             = LT
 comp _ (N n)                                                             = GT
 
-{-comp (Pow e1 e2) (Pow e3 e4) | comp e1 e3 == LT                          = LT
+comp (Pow e1 e2) (Pow e3 e4) | comp e1 e3 == LT                          = LT
                              | comp e1 e3 == GT                          = GT
                              | otherwise                                 = comp e2 e4
 comp (Pow _ _) _                                                         = GT
@@ -196,7 +204,7 @@ comp (Add es1) (Add es2)     | comp (head es1) (head es2) == LT          = LT
                                 | not (null (tail es1))                     = GT
                                 | not (null (tail es2))                     = LT-}
 
-comp e1 e2 = compare (show e1) (show e2)
+comp' e1 e2 = compare (show e1) (show e2)
 
 
 -- TODO: make expression instance of applicative?
@@ -221,27 +229,41 @@ flattenMul e
     flattenMulSingle e          = e
 
 expand :: Expr -> Expr
-expand = flattenAdd . flattenMul . expandHelper1 . flattenAdd . flattenMul
+expand = flattenAdd . expandHelper1
     where
     expandHelper1 e
         | isNumeric e   = e
         | isVariable e  = e
-        | isMul e       = expandHelper2 [] $ fromMul e
-        | otherwise     = expandHelper1 <$$> e
+        | isAdd e       = expandHelper1 <$$> e
+        | isPow e       = expandHelper1 <$$> e
+        | isMul e       = expandHelper1 <$$> expandHelper2 [] (fromMul e)
     -- expandHelper2 takes an initial list and a list of factors and returns an expansion
     expandHelper2 :: [Expr] -> [Expr] -> Expr
     expandHelper2 gs (Add ts:fs) = Add [expandHelper2 (t:gs) fs | t <- ts]
     expandHelper2 gs (f:fs)      = expandHelper2 (f:gs) fs
     expandHelper2 gs []          = mul gs
 
+combineNumsInAdd :: Expr -> Expr
+combineNumsInAdd e
+    | isNumeric e   = e
+    | isVariable e  = e
+    | isPow e       = combineNumsInAdd <$$> e
+    | isMul e       = combineNumsInAdd <$$> e
+    | isAdd e       = combineNumsInAdd <$$> (Add $
+        N (sum [fromNumeric n | n <- ts, isNumeric n])
+        :[t | t <- ts, not $ isNumeric t])
+    where
+    ts = fromAdd e
+
 combineNumsInMul :: Expr -> Expr
 combineNumsInMul e
     | isNumeric e   = e
-    | isVariable e  = Mul[N 1, e]
-    | isMul e       = Mul $
+    | isVariable e  = e
+    | isPow e       = combineNumsInMul <$$> e
+    | isAdd e       = combineNumsInMul <$$> e
+    | isMul e       = combineNumsInMul <$$> (Mul $
         N (product [fromNumeric n | n <- fs, isNumeric n])
-        :[f | f <- fs, not $ isNumeric f]
-    | otherwise     = combineNumsInMul <$$> e
+        :[f | f <- fs, not $ isNumeric f])
     where
     fs = fromMul e
 
@@ -259,23 +281,24 @@ getNumericFactors e
 
 combineTerms :: Expr -> Expr
 combineTerms e
-    | isVariable e'  = e'
-    | isNumeric e'   = e'
-    | isAdd e'       = combineTermsHelper $ fromAdd e'
-    | otherwise     = combineTerms <$$> e'
+    | isVariable e  = e
+    | isNumeric e   = e
+    | isPow e       = combineTerms <$$> e
+    | isAdd e       = combineTerms <$$> combineTermsHelper2 (fromAdd e)
+    | otherwise     = combineTerms <$$> e
     where
-    e' = sortExpr $ combineNumsInMul e
-
-    combineTermsHelper :: [Expr] -> Expr
-    combineTermsHelper (t1:t2:ts)
+    combineTermsHelper2 :: [Expr] -> Expr
+    combineTermsHelper2 (t1:t2:ts)
         | removeNumericFactors t1 == removeNumericFactors t2 =
-            combineTermsHelper $
+            combineTermsHelper2 $
             mul (
                 (N $ getNumericFactors t1 + getNumericFactors t2):
                 [removeNumericFactors t1]
             ):ts
-        | otherwise = t1 .+ combineTermsHelper (t2:ts)
-    combineTermsHelper [t] = t
+        | otherwise = t1 .+ combineTermsHelper2 (t2:ts)
+    combineTermsHelper2 [t] = t
+    combineTermsHelper2 _ = undefined -- Mul [] encountered
+    --combineTermsHelper [] = 
 
 
 removeMulBy0 :: Expr -> Expr
@@ -287,23 +310,36 @@ removeMulBy0 e
 
 removeMulBy1 :: Expr -> Expr
 removeMulBy1 e
-    | isVariable e = e
-    | isNumeric e = e
-    | isMul e = Mul [t | t <- fromMul e, t /= N 1]
-    | otherwise = removeMulBy1 <$$> e
+    | isVariable e                          = e
+    | isNumeric e                           = e
+    | isMul e                               = removeMulBy1 <$$> Mul fs
+    | otherwise                             = removeMulBy1 <$$> e
+    where
+    fs = case fs' of
+        [] -> [N 1]
+        _  -> fs'
+    fs' = [f | f <- fromMul e, f /= N 1]
 
 removeAdd0 :: Expr -> Expr
 removeAdd0 e
-    | isVariable e = e
-    | isNumeric e = e
-    | isAdd e = Add [t | t <- fromAdd e, t /= N 0]
-    | otherwise = removeAdd0 <$$> e
+    | isVariable e                          = e
+    | isNumeric e                           = e
+    | isAdd e                               = removeAdd0 <$$> Add ts
+    | otherwise                             = removeAdd0 <$$> e
+    where
+    ts = case ts' of
+        [] -> [N 0]
+        _  -> ts'
+    ts' = [t | t <- fromAdd e, t /= N 0]
 
 
 -- toCanonical :: Expr -> Expr
 toCanonical :: Expr -> Expr
 toCanonical = removeAdd0 . removeMulBy1 . removeMulBy0 . sortExpr .
-    combineTerms . sortExpr
+    combineNumsInAdd . combineNumsInMul .
+    combineTerms . expand .
+    combineNumsInAdd . combineNumsInMul .
+    flattenMul . flattenAdd
 -- sortExpr uses flattenAdd and flattenMul I think
 
 -- toCanonical' :: Expr -> Expr
@@ -366,6 +402,7 @@ findSimplest e rs = minimumBy (compare `on` lengthOfExpr) $ map toCanonical (fin
         findSimplest' e [] = []
         findSimplest' e rss = e:applyRules (head rss) e:findSimplest' e (tail rss)
 
+--e, e_r1, e_r2, ..., e_rn, e_r1r2, e_r1r3, ..., e_rnr(n-1)...r1
 
  --findSimplest expr rules = head $ sortOn lengthOfExpr (findSimplestHelper ...)
 
@@ -375,7 +412,7 @@ findSimplest e rs = minimumBy (compare `on` lengthOfExpr) $ map toCanonical (fin
 lengthOfExpr :: Expr -> Integer
 lengthOfExpr (Add ts)       = sum $ lengthOfExpr <$> ts
 lengthOfExpr (Mul fs)       = product $ lengthOfExpr <$> fs
---lengthOfExpr (Pow e1 e2)    = 1 --lengthOfExpr e1
+lengthOfExpr (Pow e1 e2)    = 1 --lengthOfExpr e1
 lengthOfExpr _              = 1
 
 ---- TODO: QuickCheck properties
@@ -397,25 +434,24 @@ toLatex (Pow e1@(N n) e2) = toLatex e1 ++ " ^{ " ++ toLatex e2 ++ " }"
 toLatex (Pow e1 e2) = "(" ++ toLatex e1 ++ ")" ++ " ^{ " ++ toLatex e2 ++ " }"
 toLatex (V (Var x)) = x
 toLatex (N n) = show n
-toLatex _ = ""
 
 
 printLatex :: Expr -> IO()
 printLatex e = putStrLn $ "$" ++ toLatex e ++ "$"
 
-x = V $ Var "x"
-y = V $ Var "y"
-z = V $ Var "z"
-a = x
-b = N 1 .+ (N (-2) .* x) .+ z
-c = (x .+ y .+ z).^(x .+ y)
-d = (x .+ y .+ z).*(x .+ y)
-e = y .+ (z .+ x)
-f = (x .+ y) .* (y .+ z) .* (x .+ z)
-g = N 1 .* x .* x.* y.* N 2
-h = ((x .* N 2) .^ x) .+ ((x .+ N 2 .+ z).*(x .+ y)) .+ (((x .* N 2) .^ x).* N 2)
-i = (N 3 .+ y) .* (N 8 .+ z) .* (N 4 .+ z)
+-- x = V $ Var "x"
+-- y = V $ Var "y"
+-- z = V $ Var "z"
+-- a = x
+-- b = N 1 .+ (N (-2) .* x) .+ z
+-- c = (x .+ y .+ z).^(x .+ y)
+-- d = (x .+ y .+ z).*(x .+ y)
+-- e = y .+ (z .+ x)
+-- f = (x .+ y) .* (y .+ z) .* (x .+ z)
+-- g = N 1 .* x .* x.* y.* N 2
+-- h = ((x .* N 2) .^ x) .+ ((x .+ N 2 .+ z).*(x .+ y)) .+ (((x .* N 2) .^ x).* N 2)
+-- i = (N 3 .+ y) .* (N 8 .+ z) .* (N 4 .+ z)
 
-h' = Add [Pow (Mul [N 2,x]) x,Mul [Pow (Mul [N 2,x]) x,N 2],Mul [x,x],Mul [x,y],Mul [x,z],Mul [y,z],Mul [N 2,x],Mul [N 2,y]]
+-- h' = Add [Pow (Mul [N 2,x]) x,Mul [Pow (Mul [N 2,x]) x,N 2],Mul [x,x],Mul [x,y],Mul [x,z],Mul [y,z],Mul [N 2,x],Mul [N 2,y]]
 
 ruleList = [(Var "x", Mul [N 2, V (Var "z")]),(Var "y", N 3),(Var "z",Mul [N 4, V (Var "z")])]
