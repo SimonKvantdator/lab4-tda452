@@ -2,6 +2,7 @@
 
 import Expression
 import ToCanonical
+import Simplify
 import Data.Maybe
 import Test.QuickCheck
 
@@ -14,23 +15,7 @@ a ~= b
     | otherwise = abs(a - b) <= epsilon * max (abs a) (abs b) + epsilon
     where
     epsilon = 0.0001
-
-newtype EvalRule = Er [(Variable, Integer)]
-    deriving Show
-
-instance Arbitrary EvalRule
-    where
-    arbitrary = Er . zip (Var . (:[]) <$> ['t'..'z']) <$> infiniteListOf ( choose (-3, 3))
-
-fromEvalRule (Er r) = r
-
--- | Evaluating Symbolic Expressions
-eval :: Floating p => EvalRule -> Expr -> p
-eval rule (N n)        = fromInteger n
-eval rule (V x)        = fromInteger $ fromJust $ lookup x (fromEvalRule rule)
-eval rule (Add ts)     = sum $ eval rule <$> ts
-eval rule (Mul fs)     = product $ eval rule <$> fs
-eval rule (Pow e1 e2)  = (eval rule e1)**(eval rule e2)
+infix 4 ~=
  
 instance Arbitrary Variable
     where
@@ -45,58 +30,133 @@ rExpr = arbitraryPositiveInteger >>= rExprHelper . intLog
     where
     rExprHelper :: Integer -> Gen Expr
     rExprHelper n | n < 0 = undefined
-    rExprHelper 0 = oneof [N <$> arbitrary, V <$> arbitrary]
+    rExprHelper 0 = oneof [N <$> choose (-5, 5), V <$> arbitrary]
     rExprHelper n = frequency [
         (3, Add <$> vectorOf 2 (rExprHelper (n - 1))),
         (3, Mul <$> vectorOf 2 (rExprHelper (n - 1))),
         (1, Pow <$> rExprHelper (n - 1) <*> rExprHelper (n - 1))
         ]
     arbitraryPositiveInteger = getPositive <$> (arbitrary :: Gen (Positive Integer))
-    -- arbitraryPositiveInteger = choose (1, 9)
 
--- rRulesForExpr :: Expr -> Gen [EvalRule]
--- rRulesForExpr e =
---     zip (vars e) <$> infiniteListOf (choose (-3, 3)) -- these values don't need to be large
 
-flattenAddProp :: (Expr, EvalRule) -> Bool
-flattenAddProp (e, rule) = n1 ~= n2
-    where 
-    n1 = eval rule e
-    n2 = eval rule $ flattenAdd e
+-- ###########################{ Testing ToCanonical }###########################
 
-flattenMulProp :: (Expr, EvalRule) -> Bool
-flattenMulProp (e, rule) = n1 ~= n2
-    where 
-    n1 = eval rule e
-    n2 = eval rule $ flattenMul e
+newtype EvalRules = EvalRules [(Variable, Integer)]
+    deriving Show
 
-combineTermsProp :: (Expr, EvalRule) -> Bool
-combineTermsProp (e, rule) = n1 ~= n2
-    where 
-    n1 = eval rule e
-    n2 = eval rule $ combineTerms e
+instance Arbitrary EvalRules where
+    arbitrary = EvalRules . zip (Var . (:[]) <$> ['t'..'z']) <$> infiniteListOf (choose (-5, 5))
 
-expandAndCombineTermsProp :: (Expr, EvalRule) -> Bool
-expandAndCombineTermsProp (e, rule) = n1 ~= n2
-    where 
-    n1 = eval rule e
-    n2 = eval rule $ combineTerms $ expand e
+fromEvalRules (EvalRules r) = r
 
-sortExprProp :: (Expr, EvalRule) -> Bool
-sortExprProp (e, rule) = n1 ~= n2
-    where 
-    n1 = eval rule e
-    n2 = eval rule $ sortExpr e
+-- | Evaluating Symbolic Expressions
+eval :: Floating p => EvalRules -> Expr -> p
+eval rules (N n)        = fromInteger n
+eval rules (V x)        = fromInteger $ fromJust $ lookup x (fromEvalRules rules)
+eval rules (Add ts)     = sum $ eval rules <$> ts
+eval rules (Mul fs)     = product $ eval rules <$> fs
+eval rules (Pow e1 e2)  = (eval rules e1)**(eval rules e2)
 
-expandProp :: (Expr, EvalRule) -> Bool
-expandProp (e, rule) = n1 ~= n2
-    where 
-    n1 = eval rule e
-    n2 = eval rule $ expand e
+propFor :: (Expr -> Expr)
+    -> (Expr, (EvalRules, EvalRules, EvalRules, EvalRules, EvalRules, EvalRules, EvalRules))
+    -> Bool
+propFor f (e, rules) = (>= 6) . length $ filter id [eval rule e ~= eval rule (f e) | rule <- toList rules]
+    where
+    toList (er1, er2, er3, er4, er5, er6, er7) = [er1, er2, er3, er4, er5, er6, er7]
 
-toCanonicalProp :: (Expr, EvalRule) -> Bool
-toCanonicalProp (e, rule) = n1 ~= n2
-    where 
-    n1 = eval rule e
-    n2 = eval rule $ toCanonical e
+flattenAddProp              = propFor flattenAdd
+flattenMulProp              = propFor flattenMul
+combineTermsProp            = propFor combineTerms
+expandAndCombineTermsProp   = propFor $ expand . combineTerms
+sortExprProp                = propFor sortExpr
+expandProp                  = propFor expand
+toCanonicalProp             = propFor toCanonical
 
+
+-- ###########################{ Testing Simplify }###########################
+
+instance Arbitrary Rule where
+    arbitrary = return $ Rule (x, N 1)
+    
+-- List of lists of compatible rules
+rulesAndCompatibleEvalRules :: (([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules))
+rulesAndCompatibleEvalRules =
+    (
+        (
+            Rule <$> [
+                 (x, Add [V y, V z])
+                ,(z, Mul [N 2, Pow (V y) (N 2)])
+                ,(x, Add [V z, V w])
+                ,(t, N 0)
+                ,(u, N 0)
+                ,(v, N 0)
+                ,(w, N 0)
+            ],
+            EvalRules [
+                 (t, 0)
+                ,(u, 0)
+                ,(v, 0)
+                ,(w, 0)
+                ,(x, 3)
+                ,(y, 1)
+                ,(z, 2)
+            ]
+        )
+        ,(
+            Rule <$> [
+                 (x, Add[V y, Mul [N (-1), V z]])
+                ,(t, Add[V u, V v])
+                ,(x, V u)
+                ,(t, V z)
+            ]
+            ,EvalRules [
+                 (t, 1)
+                ,(u, 2)
+                ,(v, -1)
+                ,(w, 0)
+                ,(x, 2)
+                ,(y, 3)
+                ,(z, 1)
+            ]
+        )
+        ,(
+            Rule <$> [
+                 (t, Mul [V u, V v])
+                ,(u, Add [V y, Mul [N (-1), V z]])
+                ,(y, Add [Mul [V u, V t], Pow (V x) (N 2), N 1])
+            ]
+            ,EvalRules [
+                 (t, -2)
+                ,(u, 2)
+                ,(v, -1)
+                ,(w, 0)
+                ,(x, 2)
+                ,(y, 3)
+                ,(z, 1)
+            ]
+        )
+    )
+
+-- rules = fst $ rulesAndCompatibleEvalRules!!0
+rules = ruleList
+-- evalRules = snd $ rulesAndCompatibleEvalRules!!0
+evalRules = EvalRules [(x, 24), (y, 3), (z, 12), (t, 0), (u, 0), (v, 0), (w, 0)]
+a = sample $ f <$> (arbitrary :: Gen Expr)
+    where
+    f = \e -> [(e, eval evalRules e), (findSimplest' e rules, eval evalRules (findSimplest' e rules))]
+
+
+-- TODO: property for checking that expression actually gets smaller
+
+
+t = Var "t"
+u = Var "u"
+v = Var "v"
+w = Var "w"
+x = Var "x"
+y = Var "y"
+z = Var "z"
+
+h = Add [Pow (Mul [N 2,V x]) (V x),Mul [Pow (Mul [N 2,V x]) (V x),N 2],Mul [V x,V x],Mul [V x,V y],Mul [V x,V z],Mul [V y,V z],Mul [N 2,V x],Mul [N 2,V y]]
+
+ruleList = Rule <$> [(x, Mul [N 2, V z]),(y, N 3),(z,Mul [N 4, V y])]

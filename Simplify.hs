@@ -9,19 +9,23 @@ module Simplify where
 import Expression
 import ToCanonical
 import Data.List
-import Data.List.Unique
+-- import Data.List.Unique
 import Data.Function (on)
 
-type Rule = (Variable, Expr)
+newtype Rule = Rule (Variable, Expr)
+    deriving Show
+
+fromRule :: Rule -> (Variable, Expr)
+fromRule (Rule (x, e)) = (x, e)
 
 -- generateMoreRules [x = y / z] = [x = y / z, y = x / z, z = y / x]
 
 applyRule :: Rule -> Expr -> Expr
-applyRule (x, e) (V y) | x == y  = e
-applyRule r (Add ts)             = Add (applyRule r <$> ts)
-applyRule r (Mul fs)             = Mul (applyRule r <$> fs)
-applyRule r (Pow e1 e2)          = Pow (applyRule r e1) (applyRule r e2)
-applyRule r e                    = e
+applyRule (Rule (x, e)) (V y) | x == y  = e
+applyRule r (Add ts)                    = Add (applyRule r <$> ts)
+applyRule r (Mul fs)                    = Mul (applyRule r <$> fs)
+applyRule r (Pow e1 e2)                 = Pow (applyRule r e1) (applyRule r e2)
+applyRule r e                           = e
 
 -- applies a list of rules in order to an expression
 applyRules :: [Rule] -> Expr -> Expr
@@ -29,18 +33,30 @@ applyRules [] e = e
 applyRules rs e = applyRules (tail rs) (applyRule (head rs) e)
 
 findSimplest :: Expr -> [Rule] -> Expr
-findSimplest e rs = minimumBy (compare `on` lengthOfExpr) $ map toCanonical (findSimplest' e $ uniq $ concatMap subsequences (permutations rs))
+findSimplest e rs = head $ findSimplestHelper depth [e] rs
     where
-        findSimplest' :: Expr -> [[Rule]] -> [Expr]
-        findSimplest' e [] = []
-        findSimplest' e rss = applyRules (head rss) e:findSimplest' e (tail rss)
+    findSimplestHelper :: Int -> [Expr] -> [Rule] -> [Expr]
+    findSimplestHelper 0 es _  = es
+    findSimplestHelper d es rs =
+        findSimplestHelper
+            (d - 1)
+            (take numToKeepEachIteration $
+                sortBy (compare `on` lengthOfExpr) $
+                nub $ toCanonical <$> [applyRule r e| r <- rs, e <- es])
+            rs
+    depth = 30
+    numToKeepEachIteration = 10
 
---e, e_r1, e_r2, ..., e_rn, e_r1r2, e_r1r3, ..., e_rnr(n-1)...r1
-
- --findSimplest expr rules = head $ sortOn lengthOfExpr (findSimplestHelper ...)
-
----- findSimplestHelper :: Int -> Int -> [Expr] -> [Rule] -> [Expr]
----- findSimplestHelper depth maxLength currentExpr rules = ...
+findSimplest' :: Expr -> [Rule] -> Expr
+findSimplest' e rs = minimumBy (compare `on` lengthOfExpr) $
+    map toCanonical (findSimplestHelper e $
+    (map . map) Rule $
+    nub $
+    concatMap subsequences (permutations $ fromRule <$> rs))
+    where
+    findSimplestHelper :: Expr -> [[Rule]] -> [Expr]
+    findSimplestHelper e []     = []
+    findSimplestHelper e rss    = applyRules (head rss) e:findSimplestHelper e (tail rss)
 
 lengthOfExpr :: Expr -> Integer
 lengthOfExpr (Add ts)       = sum $ lengthOfExpr <$> ts
@@ -50,25 +66,25 @@ lengthOfExpr _              = 1
 
 -- TODO: fix toLatex $ Add [(N 16) .* (x), N (-9), N 17, Mul [N (-14), N (-4), N 12, y]]
 toLatex :: Expr -> String
-toLatex (Add [e]) = toLatex e
-toLatex (Add (e:es)) = toLatex e ++ " + " ++ toLatex (Add es)
-toLatex (Mul [e]) = toLatex e
-toLatex (Mul (e:es)) = toLatex e ++  toLatex (Mul es)
+toLatex (Add [e])               = toLatex e
+toLatex (Add (e:es))            = toLatex e ++ " + " ++ toLatex (Add es)
+toLatex (Mul [e])               = toLatex e
+toLatex (Mul (e:es))            = toLatex e ++  toLatex (Mul es)
 toLatex (Pow e1@(V (Var x)) e2) = toLatex e1 ++ " ^{ " ++ toLatex e2 ++ " }"
-toLatex (Pow e1@(N n) e2) = toLatex e1 ++ " ^{ " ++ toLatex e2 ++ " }"
-toLatex (Pow e1 e2) = "(" ++ toLatex e1 ++ ")" ++ " ^{ " ++ toLatex e2 ++ " }"
-toLatex (V (Var x)) = x
-toLatex (N n) = show n
-toLatex _ = ""
+toLatex (Pow e1@(N n) e2)       = toLatex e1 ++ " ^{ " ++ toLatex e2 ++ " }"
+toLatex (Pow e1 e2)             = "(" ++ toLatex e1 ++ ")" ++ " ^{ " ++ toLatex e2 ++ " }"
+toLatex (V (Var x))             = x
+toLatex (N n)                   = show n
+toLatex _                       = ""
 
 
 printLatex :: Expr -> IO()
 printLatex e = putStrLn $ "$" ++ toLatex e ++ "$"
 
-x = V $ Var "x"
-y = V $ Var "y"
-z = V $ Var "z"
+-- x = V $ Var "x"
+-- y = V $ Var "y"
+-- z = V $ Var "z"
 
-h' = Add [Pow (Mul [N 2,x]) x,Mul [Pow (Mul [N 2,x]) x,N 2],Mul [x,x],Mul [x,y],Mul [x,z],Mul [y,z],Mul [N 2,x],Mul [N 2,y]]
+-- h' = Add [Pow (Mul [N 2,x]) x,Mul [Pow (Mul [N 2,x]) x,N 2],Mul [x,x],Mul [x,y],Mul [x,z],Mul [y,z],Mul [N 2,x],Mul [N 2,y]]
 
-ruleList = [(Var "x", Mul [N 2, V (Var "z")]),(Var "y", N 3),(Var "z",Mul [N 4, V (Var "y")])]
+-- ruleList = Rule <$> [(Var "x", Mul [N 2, V (Var "z")]),(Var "y", N 3),(Var "z",Mul [N 4, V (Var "y")])]

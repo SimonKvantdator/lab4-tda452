@@ -12,25 +12,29 @@ sortExpr e
     | isMul e       = sortExpr <$$> Mul (sortBy comp $ fromMul e)
     | isPow e       = sortExpr <$$> e
 
-
-
 -- TODO: make expression instance of applicative?
 flattenAdd :: Expr -> Expr
+flattenAdd (Add []) = N 0
+flattenAdd (Add [t]) = flattenAdd t
 flattenAdd e
     | isNumeric e   = e
     | isVariable e  = e
     | isPow e       = flattenAdd <$$> e
-    | otherwise     = flattenAddSingle $ flattenAdd <$$> e
+    | isMul e       = flattenAdd <$$> e
+    | isAdd e       = flattenAddSingle $ flattenAdd <$$> e
     where
     flattenAddSingle (Add ts)   =
         Add $ concat $ [t | t <- ts, not $ isAdd t]:[fromAdd t | t <- ts, isAdd t]
     flattenAddSingle e          = e
 
 flattenMul :: Expr -> Expr
+flattenMul (Mul []) = N 1
+flattenMul (Mul [f]) = flattenMul f
 flattenMul e
     | isNumeric e   = e
     | isVariable e  = e
     | isPow e       = flattenMul <$$> e
+    | isAdd e       = flattenMul <$$> e
     | otherwise     = flattenMulSingle $ flattenMul <$$> e
     where
     flattenMulSingle (Mul fs)   =
@@ -82,15 +86,15 @@ combineNumsInMul e
 
 removeNumericFactors :: Expr -> Expr
 removeNumericFactors e
-    | isMul e'  = mul $ filter (not . isNumeric) (fromMul e')
-    | otherwise = e'
-    where e' = flattenMul e
+    | isMul e       = mul $ filter (not . isNumeric) (fromMul e)
+    | isNumeric e   = N 1
+    | otherwise     = e
 
 getNumericFactors :: Expr -> Integer
 getNumericFactors e
-    | isMul e'  = product $ fromNumeric <$> filter isNumeric (fromMul e')
-    | otherwise = 1
-    where e'    = flattenMul e
+    | isMul e       = product $ fromNumeric <$> filter isNumeric (fromMul e)
+    | isNumeric e   = fromNumeric e
+    | otherwise     = 1
 
 combineTerms :: Expr -> Expr
 combineTerms e
@@ -112,6 +116,35 @@ combineTerms e
     combineTermsHelper2 [t] = t
     combineTermsHelper2 _ = undefined -- Mul [] encountered
 
+combineNumsInPow :: Expr -> Expr
+combineNumsInPow (Pow (N n) (N m))
+    | m >= 0    = N $ n^m
+combineNumsInPow e
+    | isPow e   = combineNumsInPow <$$> e
+    | isAdd e   = combineNumsInPow <$$> e
+    | isMul e   = combineNumsInPow <$$> e
+    | otherwise = e
+
+
+extractSingleElem :: Expr -> Expr
+extractSingleElem (Mul [e]) = extractSingleElem e
+extractSingleElem (Add [e]) = extractSingleElem e
+extractSingleElem e = e 
+            
+
+combinePwrsInMul :: Expr -> Expr
+combinePwrsInMul e
+    | isPow e       = combinePwrsInMul <$$> e
+    | isAdd e       = combinePwrsInMul <$$> e
+    | isMul e       = combinePwrsInMul <$$> Mul (
+            [v | v <- fs, numFact v == Add [N 1]]
+            ++ nub ([Pow v (numFact v)| v <- nub fs, numFact v /= Add [N 1], not $ isPow v]
+            ++ [Pow (fst $ fromPow v) (numFact (fst $ fromPow v))| v <- nub fs, numFact v /= Add [N 1], isPow v]))
+    | otherwise     = e
+    where
+        fs = fromMul e
+        numFact v = flattenAdd . removeAdd0 . Add $ N (fromIntegral $ length [t | t <- fs, t == v, not $ isPow t]):[snd (fromPow t) | t <- fs, isPow t, fst (fromPow t) == v]
+
 removeMulBy0 :: Expr -> Expr
 removeMulBy0 e
     | isVariable e                      = e
@@ -123,33 +156,44 @@ removeMulBy1 :: Expr -> Expr
 removeMulBy1 e
     | isVariable e                          = e
     | isNumeric e                           = e
-    | isMul e                               = removeMulBy1 <$$> Mul fs
+    | isMul e                               = removeMulBy1 <$$> e'
     | otherwise                             = removeMulBy1 <$$> e
     where
-    fs = case fs' of
-        [] -> [N 1]
-        _  -> fs'
+    e' = case fs' of
+        [] -> N 1
+        _  -> Mul fs'
     fs' = [f | f <- fromMul e, f /= N 1]
 
 removeAdd0 :: Expr -> Expr
 removeAdd0 e
     | isVariable e                          = e
     | isNumeric e                           = e
-    | isAdd e                               = removeAdd0 <$$> Add ts
+    | isAdd e                               = removeAdd0 <$$> e'
     | otherwise                             = removeAdd0 <$$> e
     where
-    ts = case ts' of
-        [] -> [N 0]
-        _  -> ts'
+    e' = case ts' of
+        [] -> N 0
+        _  -> Add ts'
     ts' = [t | t <- fromAdd e, t /= N 0]
 
 
 toCanonical :: Expr -> Expr
 toCanonical =
     sortExpr .
+    flattenMul . flattenAdd .
     removeAdd0 . removeMulBy1 . removeMulBy0 .
     combineTerms .
-    combineNumsInAdd . combineNumsInMul .
+    combineNumsInAdd . combineNumsInMul . combinePwrsInMul . combineNumsInPow . 
     expand .
     combineNumsInAdd . combineNumsInMul .
     flattenMul . flattenAdd
+
+-- x = V $ Var "x"
+-- y = V $ Var "y"
+-- z = V $ Var "z"
+
+-- h' = Add [Mul [Pow (Mul [N 2,x]) x,Mul [Pow (Mul [N 2,x]) x,N 2]],Mul [x,x],Mul [x,y],Mul [x,z],Mul [y,z],Mul [N 2,x],Mul [N 2,y]]
+
+-- ruleList = [(Var "x", Mul [N 2, V (Var "z")]),(Var "y", N 3),(Var "z",N 4)]--(Var "z",Mul [N 4, V (Var "y")])] 
+
+-- h = Add [N 2, Mul [N 3,Pow (N 3) (N 4)]]

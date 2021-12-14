@@ -30,7 +30,7 @@ isMul _         = False
 
 fromMul :: Expr -> [Expr]
 fromMul (Mul fs)  = fs
-fromMul e         = [e] -- TODO: reconsider
+fromMul e         = [e]
 
 isVariable :: Expr -> Bool
 isVariable (V _) = True
@@ -47,6 +47,9 @@ isPow :: Expr -> Bool
 isPow (Pow _ _)   = True
 isPow _         = False
 
+fromPow :: Expr -> (Expr, Expr)
+fromPow (Pow s t) = (s,t)
+
 -- TODO: describe this operator
 emap :: (Expr -> Expr) -> Expr -> Expr
 emap f (Add ts) = Add $ map f ts
@@ -55,9 +58,6 @@ emap f (Pow e1 e2) = Pow (f e1) (f e2)
 emap f e = f e
 (<$$>) = emap
 infixr 4 <$$>
-
--- TODO: how to deal with empty Adds and Muls?
--- Does it make sense to simplify Add [] to 0 and Mul [] to 1?
 
 (.+) :: Expr -> Expr -> Expr
 x .+ y = Add [x, y]
@@ -80,45 +80,49 @@ infixr 8 .^
 
 -- TODO: make minus look nice
 instance Show Expr where
-    show (V (Var s))        = s
-    show (N n)              = show n
+    show = show1
+    -- show = show2 -- More verbose show
 
-    show (Add [t])          = show t
-    show (Add (t:ts))       = show t ++ " + " ++ show (Add ts)
-    show (Add [])           = ""
+show1 :: Expr -> String
+show1 (V v)              = show v
+show1 (N n)              = show n
 
-    show (Mul [Add ts])     = "(" ++ show (Add ts) ++ ")"
-    show (Mul [f])          = show f
-    show (Mul (Add ts:fs))  = "(" ++ show (Add ts) ++ ")*" ++ show (Mul fs)
-    show (Mul (N n:fs))
-        | n < 0             = "(" ++ show n ++ ")*" ++ show (Mul fs)
-    show (Mul (f:fs))       = show f ++ "*" ++ show (Mul fs)
-    show (Mul [])           = ""
+show1 (Add [t])          = show1 t
+show1 (Add (t:ts))       = show1 t ++ " + " ++ show1 (Add ts)
+show1 (Add [])           = ""
 
-    show (Pow (N n) (N m))  = show n ++ "^" ++ show m
-    show (Pow (V n) (N m))  = show n ++ "^" ++ show m
-    show (Pow (N n) (V m))  = show n ++ "^" ++ show m
-    show (Pow (V n) (V m))  = show n ++ "^" ++ show m
+show1 (Mul [Add ts])     = "(" ++ show1 (Add ts) ++ ")"
+show1 (Mul [f])          = show1 f
+show1 (Mul (Add ts:fs))  = "(" ++ show1 (Add ts) ++ ")*" ++ show1 (Mul fs)
+show1 (Mul (N n:fs))
+    | n < 0             = "(" ++ show n ++ ")*" ++ show1 (Mul fs)
+show1 (Mul (f:fs))       = show1 f ++ "*" ++ show1 (Mul fs)
+show1 (Mul [])           = ""
 
-    show (Pow (N n) e)      = show n ++ "^(" ++ show e ++ ")"
-    show (Pow (V n) e)      = show n ++ "^(" ++ show e ++ ")"
-    show (Pow e (N n))      = "(" ++ show e ++ ")^" ++ show n
-    show (Pow e (V n))      = "(" ++ show e ++ ")^" ++ show n
+show1 (Pow (N n) (N m))  = show n ++ "^" ++ show m
+show1 (Pow (V n) (N m))  = show n ++ "^" ++ show m
+show1 (Pow (N n) (V m))  = show n ++ "^" ++ show m
+show1 (Pow (V n) (V m))  = show n ++ "^" ++ show m
 
-    show (Pow x1 x2)        = "(" ++ show x1 ++ ")^(" ++ show x2 ++ ")"
+show1 (Pow (N n) e)      = show n ++ "^(" ++ show1 e ++ ")"
+show1 (Pow (V v) e)      = show v ++ "^(" ++ show1 e ++ ")"
+show1 (Pow e (N n))      = "(" ++ show1 e ++ ")^" ++ show n
+show1 (Pow e (V v))      = "(" ++ show1 e ++ ")^" ++ show v
 
--- More verbose show
-show' :: Expr -> String
-show' (V v)         = "V " ++ show v
-show' (N n)         = "N " ++ show n
-show' (Add ts)      = "Add [" ++ foldl (\x y -> x ++ "," ++ y) (show' $ head ts) (show' <$> tail ts) ++ "]"
-show' (Mul fs)      = "Mul [" ++ foldl (\x y -> x ++ "," ++ y) (show' $ head fs) (show' <$> tail fs) ++ "]"
-show' (Pow x y)     = "Pow (" ++ show' x ++ ") (" ++ show' y ++ ")"
+show1 (Pow x1 x2)        = "(" ++ show1 x1 ++ ")^(" ++ show1 x2 ++ ")"
 
--- TODO: do we really want to do this?
+show2 :: Expr -> String
+show2 (V v)     = "V " ++ show v
+show2 (N n)
+    | n < 0     = "N (" ++ show n ++ ")"
+    | otherwise = "N " ++ show n
+show2 (Add ts)  = "Add [" ++ foldl (\x y -> x ++ "," ++ y) (show2 $ head ts) (show2 <$> tail ts) ++ "]"
+show2 (Mul fs)  = "Mul [" ++ foldl (\x y -> x ++ "," ++ y) (show2 $ head fs) (show2 <$> tail fs) ++ "]"
+show2 (Pow x y) = "Pow (" ++ show2 x ++ ") (" ++ show2 y ++ ")"
+
 instance Eq Expr
     where
-    e == f = show e == show f
+    e == f = show1 e == show1 f
 
 instance Ord Expr
     where
@@ -131,4 +135,4 @@ comp :: Expr -> Expr -> Ordering
 comp (N n) (N s)                                                         = compare n s
 comp (N n) _                                                             = LT
 comp _ (N n)                                                             = GT
-comp e1 e2 = compare (show e1) (show e2)
+comp e1 e2 = compare (show1 e1) (show1 e2)
