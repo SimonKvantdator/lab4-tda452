@@ -1,0 +1,164 @@
+%! TEX root = /home/simon/Documents/masterarbete/presentation/presentation.tex
+
+% ### From template ###
+
+\mode<presentation>
+\usepackage{pgfpages}
+
+
+%%%%%%%%%%% LANGUAGE %%%%%%%%%%%
+
+% For correct hyphenation in swedish
+\usepackage{fontenc}
+
+% For interpreting non-ASCII characters
+\usepackage[utf8]{inputenc}
+
+% International language support
+% Fetches language from documentclass options. Most other packages do this as well
+\usepackage{babel}
+
+
+%%%%%%%%%%% FORMAL STUFF %%%%%%%%%%%
+
+% Dates & time
+\usepackage[yyyymmdd]{datetime} % Useful when referencing websites
+\renewcommand{\dateseparator}{-} % ISO 8601 date format
+
+
+% Citing & bibliography
+\usepackage{csquotes} % For \enquote command for proper quotation marks, also biblatex recommends this
+\usepackage[numbers]{natbib}
+
+
+%%%%%%%%%%% GRAPHICS %%%%%%%%%%%
+
+% \usepackage{graphics, color}
+% \usepackage[table]{xcolor}
+
+% Figures
+% \usepackage{epsfig} % Solves some problems in \includegraphics{<.eps-file>}
+% \usepackage{graphicx} % More options for \includegraphics
+% \usepackage{float} % Figure placement
+% \usepackage[labelfont=bf, textfont=normal,justification=justified,singlelinecheck=false]{caption} % More options for \caption
+% \usepackage{subcaption} % Subfigures
+
+% Tikz
+% \usepackage{tikz}
+% \usepackage{pgf, pgfplots} % Pgfplot
+% \pgfplotsset{compat=1.15}
+
+% För alduslöv
+\usepackage{pifont}
+
+
+%%%%%%%%%%% PHYSICS %%%%%%%%%%%
+
+% SI units
+\usepackage{siunitx}
+\DeclareSIUnit\clight{\text{$c$}} % redefine from c_0 to c
+\DeclareSIUnit\byte{B}
+
+% Physics macros
+\usepackage{physics} % Defines lots of nice commands like \derivative, \norm, \evaluated, etc. It is recommended to use these as much as possible for nice spacing and readable LaTeX code.
+\usepackage{braket} % Defines \bra, \ket, \braket, and \set
+\usepackage{tensor} % Covariant index notation
+\usepackage[]{slashed} 
+
+
+%%%%%%%%%%% CODING %%%%%%%%%%%
+
+% For nice code insertions
+\usepackage{listings}
+\lstloadlanguages{Mathematica}
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=4
+}
+\lstset{style=mystyle}
+
+
+%%%%%%%%%%% MATHEMATICS %%%%%%%%%%%
+
+% AMS packages
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amsthm}
+\usepackage{amssymb}
+\usepackage{mathrsfs}
+
+% Better version of the \not command
+\usepackage{cancel}
+
+%%%%%%%%%%% MISCELLANEOUS %%%%%%%%%%%
+
+% Clickable links and refs
+% \usepackage{hyperref}								
+% \hypersetup{final, colorlinks, citecolor=black, filecolor=black, linkcolor=black, urlcolor=black}
+
+% Cleverref automatically detects if you are referencing a figure, table, or equation etc
+% Cleverref has to be loaded last I think, after babel and hyperref etc
+% \usepackage[noabbrev, nameinlink]{cleveref}
+% \crefname{equation}{}{}
+% \iflanguage{swedish}{ % Tell cleverref to use Oxford comma
+% 	\newcommand{\creflastconjunction}{, och\nobreakspace}
+% }{}
+% \iflanguage{english}{
+% 	\newcommand{\creflastconjunction}{, and\nobreakspace}
+% }{}
+
+% Theorem and proof environments
+% Has to be put after loading cleveref
+% \iflanguage{swedish}{
+%     \newtheorem{theorem}{Sats}
+%     \newtheorem*{theorem*}{Sats}
+%     \newtheorem{proposition}{Proposition}
+%     \newtheorem*{proposition*}{Proposition}
+%     \newtheorem{corollary}{Följdsats}[theorem]
+%     \newtheorem{corollary*}{Följdsats}
+%     \newtheorem{lemma}{Lemma}
+%     \newtheorem*{lemma*}{Lemma}
+%     \newtheorem{remark}{Kommentar}
+%     \newtheorem*{remark*}{Kommentar}
+%     \theoremstyle{definition}
+%     \newtheorem{definition}{Definition}
+%     \newtheorem*{definition*}{Definition}
+% }{}
+% \iflanguage{english}{
+%     \newtheorem{theorem}{Theorem}
+%     \newtheorem*{theorem*}{Theorem}
+%     \newtheorem{proposition}[theorem]{Proposition}
+%     \newtheorem*{proposition*}{Proposition}
+%     \newtheorem{corollary}{Corollary}[theorem]
+%     \newtheorem{corollary*}{Corollary}
+%     \newtheorem{lemma}[theorem]{Lemma}
+%     \newtheorem*{lemma*}{Lemma}
+%     \newtheorem{remark}[theorem]{Remark}
+%     \newtheorem*{remark*}{Remark}
+%     \theoremstyle{definition}
+%     \newtheorem{definition}[theorem]{Definition}
+%     \newtheorem*{definition*}{Definition}
+% }{}
+
+% Intervals on the real line
+\let\interval\undefined % To avoid name conflict with etextools
+\usepackage{interval}
+\intervalconfig{soft open fences}

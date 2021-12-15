@@ -1,0 +1,72 @@
+%! TEX root = /home/simon/Documents/masterarbete/presentation/presentation.tex
+
+% Vectors are upright boldface. I think this definition is better than the physics package's \vectorbold.
+\let\Vec\undefined % We use \vec w/ lowercase v
+\renewcommand*{\vec}[1]{{\boldsymbol{\mathrm{#1}}}}
+
+% Bar, tilde, and hat that scales with what is under them. Basically I just want these to have consistent names
+\let\mathbar\overline
+\let\mathtilde\widetilde
+\let\mathhat\widehat
+
+% Redefine \exp
+% Errors occur if this definition is made before some of the packages are loaded
+\let\oldexp\exp
+\newcommand*{\Exp}[1]{\oldexp{#1}}
+\renewcommand{\exp}[1]{\mathrm{e}^{#1}}
+
+% Main number systems
+\newcommand{\naturals}{\mathbb{N}}
+\newcommand{\integers}{\mathbb{Z}}
+\newcommand{\rationals}{\mathbb{Q}}
+\newcommand{\reals}{\mathbb{R}}
+\newcommand{\complexnumbers}{\mathbb{C}}
+
+% Some of my own shorthands for correct spacing in math environments
+\def\divides{\mid} % Proper spacing of vertical bar in division x|y
+\def\from{\colon} % Proper spacing of colon in functions f:A→ B
+\newlength\mylen % Isomorphic \mapsto
+\settowidth\mylen{$\longleftrightarrow$}
+\newcommand{\mapsbetween}{\longleftrightarrow\kern - 0.5\mylen\vline height 1.2ex depth -0.0pt\kern0.5\mylen}
+\newcommand{\suchthat}{\qq{s.th.}}
+\def\definedas{\coloneqq}
+\def\defines{\eqqcolon}
+
+\newcommand*{\transpose}[1]{{#1}^{\!\mathsf{T}}}
+\renewcommand*{\complement}[1]{{#1}^{\mathsf{C}}}
+% \newcommand{\conjugate}[1]{\stackrel{\rule{0.4em}{0.3pt}}{#1}}
+% \newcommand{\conjugate}[1]{\mathbar{#1}}
+% \newcommand*{\conjugate}[1]{{#1}^*}
+\newcommand{\conjugate}[1]{\mkern 1.0mu\overline{\mkern-1.0mu#1\mkern-1.0mu}\mkern 1.0mu}
+\newcommand*{\hermitianconjugate}[1]{{#1}^\dag}
+\newcommand*{\inverse}[1]{{#1}^{-1}}
+\newcommand*{\dual}[1]{{#1}^{*}} % dual vector space
+
+\newcommand*{\closure}[1]{\mathbar{#1}} % Closure of a set
+\def\union{\cup}
+\newcommand{\Union}{\bigcup\limits}
+\def\intersection{\cap}
+\newcommand{\Intersection}{\bigcap\limits}
+
+% Lie-groups & algebras, i.g. SU(n)
+\newcommand*{\algebra}[2]{{\mathfrak{\MakeLowercase{#1}}}{\left(#2\right)}}
+\newcommand*{\group}[2]{{\mathrm{\MakeUppercase{#1}}}{\left(#2\right)}}
+
+% Fundamental operators
+\newcommand{\fundamentaldivergence}{\mathscr{D}}
+\newcommand{\fundamentalcurl}{\mathscr{C}}
+\newcommand{\fundamentaltwistor}{\mathscr{T}}
+
+\newcommand{\sDiv}{\fundamentaldivergence}
+\newcommand{\sTwist}{\fundamentaltwistor}
+\newcommand{\sCurl}{\fundamentalcurl}
+\newcommand{\sCurlDagger}{\fundamentalcurl^\dagger}
+
+% Symmetric multiplication
+\newcommand{\SymMult}[2]{\overset{#1, #2}{\odot}}
+
+% To force some equations to be numbered
+\newcommand\hiddenref[1]{\sbox0{\cref{#1}}}
+
+% SymH
+\DeclareMathOperator*{\Sym}{Sym}

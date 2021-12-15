@@ -1,0 +1,79 @@
+\documentclass[english, 12pt, t, aspectratio=169]{beamer}
+\usetheme[titleflower=true]{chalmers} % titleflower = true or false, true left less space for my titel tho :(
+\input{preamble/preamble.tex} 
+\input{preamble/my_commands.tex} 
+
+% \setbeameroption{show notes on second screen=right}
+% \setbeameroption{hide notes}
+
+\title{Simplification of symbolic expressions with constraints}
+\subtitle{Lab 4 TDA452}
+\institute{Chalmers University of Technology}
+\author{Emma Ringström \& Simon Jacobsson}
+\date{2021-12-17}
+
+\begin{document}
+
+\begin{frame}
+	\titlepage
+\end{frame}
+
+\begin{frame}[t]
+	\frametitle{Problem formulation}
+	What we want to model:
+	\begin{align}
+		&x^4 + (y + 1) z, \label{eq:expression}\\
+		&y = z - 1, \label{eq:condition1}\\
+		&z = x^2. \label{eq:condition2}
+	\end{align}
+	Substituting \eqref{eq:condition1}, followed by \eqref{eq:condition2}, simplifies \eqref{eq:expression} to
+	\begin{align}
+		2 x^4.
+	\end{align}
+	
+\end{frame}
+
+\begin{frame}[fragile]
+	\frametitle{Our model}
+	\begin{verbatim}
+		newtype Variable = Variable String
+		    deriving Eq
+	\end{verbatim}
+	\begin{verbatim}
+		data Expr =
+		    N Integer
+		    | V Variable
+		    | Add [Expr]
+		    | Mul [Expr]
+		    | Pow Expr Expr
+	\end{verbatim}
+	
+\end{frame}
+\begin{frame}[fragile]
+	\frametitle{Canonical form of expressions}
+	\begin{verbatim}
+		toCanonical :: Expr -> Expr
+	\end{verbatim}
+	\begin{itemize}
+		\item distributes multiplication over addition
+		\item combines terms with the same factors
+		\item removes multiplication by 1 and addition by 0
+		\item etc
+	\end{itemize}
+\end{frame}
+\begin{frame}[fragile]
+	\frametitle{Simplification}
+	\begin{verbatim}
+		newtype Rule = Rule (Variable, Expr)
+
+		findSimplest :: Expr -> [Rule] -> Expr
+	\end{verbatim}
+
+	\begin{itemize}
+		\item builds a list of new expressions by applying a list of rules
+		\item iterates
+		\item prunes the expression list according to some heuristic
+	\end{itemize}
+\end{frame}
+
+\end{document}

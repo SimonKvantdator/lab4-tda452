@@ -1,0 +1,12 @@
+\frametitle{Simplification}
+	\begin{verbatim}
+		newtype Rule = Rule (Variable, Expr)
+
+		findSimplest :: Expr -> [Rule] -> Expr
+	\end{verbatim}
+
+	\begin{itemize}
+		\item builds a list of new expressions by applying a list of rules
+		\item iterates
+		\item prunes the expression list according to some heuristic
+	\end{itemize}
