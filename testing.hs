@@ -19,7 +19,7 @@ infix 4 ~=
  
 instance Arbitrary Variable
     where
-    arbitrary = Var . (:[]) <$> choose ('t', 'z') -- This is the right amount of variables
+    arbitrary = Variable . (:[]) <$> choose ('t', 'z') -- This is the right amount of variables
 
 instance Arbitrary Expr
     where
@@ -41,18 +41,19 @@ rExpr = arbitraryPositiveInteger >>= rExprHelper . intLog
 
 -- ###########################{ Testing ToCanonical }###########################
 
-newtype EvalRules = EvalRules [(Variable, Integer)]
+newtype EvalRules = EvalRules [(Variable, Float)]
     deriving Show
 
 instance Arbitrary EvalRules where
-    arbitrary = EvalRules . zip (Var . (:[]) <$> ['t'..'z']) <$> infiniteListOf (choose (-5, 5))
+    -- arbitrary = EvalRules . zip (Var . (:[]) <$> ['t'..'z']) <$> infiniteListOf (choose (-7, 7))
+    arbitrary = EvalRules . zip (Variable . (:[]) <$> ['t'..'z']) <$> infiniteListOf (arbitrary :: Gen Float)
 
 fromEvalRules (EvalRules r) = r
 
 -- | Evaluating Symbolic Expressions
-eval :: Floating p => EvalRules -> Expr -> p
+eval :: EvalRules -> Expr -> Float
 eval rules (N n)        = fromInteger n
-eval rules (V x)        = fromInteger $ fromJust $ lookup x (fromEvalRules rules)
+eval rules (V x)        = fromJust $ lookup x (fromEvalRules rules)
 eval rules (Add ts)     = sum $ eval rules <$> ts
 eval rules (Mul fs)     = product $ eval rules <$> fs
 eval rules (Pow e1 e2)  = (eval rules e1)**(eval rules e2)
@@ -60,7 +61,7 @@ eval rules (Pow e1 e2)  = (eval rules e1)**(eval rules e2)
 propFor :: (Expr -> Expr)
     -> (Expr, (EvalRules, EvalRules, EvalRules, EvalRules, EvalRules, EvalRules, EvalRules))
     -> Bool
-propFor f (e, rules) = (>= 6) . length $ filter id [eval rule e ~= eval rule (f e) | rule <- toList rules]
+propFor f (e, ruless) = (>= 6) . length $ filter id [eval rules e ~= eval rules (f e) | rules <- toList ruless]
     where
     toList (er1, er2, er3, er4, er5, er6, er7) = [er1, er2, er3, er4, er5, er6, er7]
 
@@ -78,8 +79,8 @@ toCanonicalProp             = propFor toCanonical
 instance Arbitrary Rule where
     arbitrary = return $ Rule (x, N 1)
     
--- List of lists of compatible rules
-{-rulesAndCompatibleEvalRules :: (([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules))
+-- 7-tuple of tuples of compatible EvalRules and Rules
+rulesAndCompatibleEvalRules :: (([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules))
 rulesAndCompatibleEvalRules =
     (
         (
@@ -135,14 +136,91 @@ rulesAndCompatibleEvalRules =
                 ,(z, 1)
             ]
         )
+        ,(
+            Rule <$> [
+                 (t, V y)
+                ,(u, V t .+ V z)
+                ,(v, V w .* V z .+ V u)
+                ,(w, Pow (V z) (N 2))
+                ,(x, V u .* V v .+ Pow (V y) (N 2))
+                ,(y, N 3 .* V z)
+                ,(z, V v .- V u)
+            ]
+            ,EvalRules [
+                 (t, 3)
+                ,(u, 4)
+                ,(v, 5)
+                ,(w, 1)
+                ,(x, 29)
+                ,(y, 3)
+                ,(z, 1)
+            ]
+        )
+        ,(
+            Rule <$> [
+                 (t, V w .* V x)
+                ,(u, Pow (V w) (N 2) .* V y)
+                ,(v, V u .* Pow (V y) (N (-1)) .* Pow (V w) (N 2))
+                ,(w, V y .- V z)
+            ]
+            ,EvalRules [
+                 (t, 10)
+                ,(u, 12)
+                ,(v, 16)
+                ,(w, 2)
+                ,(x, 5)
+                ,(y, 3)
+                ,(z, 1)
+            ]
+        )
+        ,(
+            Rule <$> [
+                 (t, V y .- N 2 .* V z)
+                ,(u, V y .- V w)
+                ,(v, V w .* V y)
+                ,(w, V t .+ V u)
+            ]
+            ,EvalRules [
+                 (t, 1)
+                ,(u, 1)
+                ,(v, 6)
+                ,(w, 2)
+                ,(x, 0)
+                ,(y, 3)
+                ,(z, 1)
+            ]
+        )
+        ,(
+            Rule <$> [
+                 (t, V y .- N 2 .* V t)
+                ,(u, Pow (V w) (N 2))
+                ,(v, V w .* V y)
+                ,(w, V t .* N 2)
+                ,(x, V z .* V w)
+            ]
+            ,EvalRules [
+                 (t, 1)
+                ,(u, 4)
+                ,(v, 6)
+                ,(w, 2)
+                ,(x, 10)
+                ,(y, 3)
+                ,(z, 5)
+            ]
+        )
     )
--}
+
 -- rules = fst $ rulesAndCompatibleEvalRules!!0
 rules = ruleList
 -- evalRules = snd $ rulesAndCompatibleEvalRules!!0
 evalRules = EvalRules [(x, 24), (y, 3), (z, 12), (t, 0), (u, 0), (v, 0), (w, 0)]
-a = sample $ f <$> (arbitrary :: Gen Expr)
+findSimplestProp :: Expr -> Bool
+findSimplestProp e = (>= 6) . length $ filter id [
+    eval evalRules e ~=
+    eval evalRules (findSimplest e rules)
+    | (rules, evalRules) <- toList rulesAndCompatibleEvalRules]
     where
+    toList (er1, er2, er3, er4, er5, er6, er7) = [er1, er2, er3, er4, er5, er6, er7]
     f = \e -> [(e, eval evalRules e), (findSimplest e rules, eval evalRules (findSimplest e rules))]
 
 
@@ -156,13 +234,13 @@ findSimplestSmallerProp e rs = lengthOfExpr e >= lengthOfExpr (findSimplest e rs
 
 
 
-t = Var "t"
-u = Var "u"
-v = Var "v"
-w = Var "w"
-x = Var "x"
-y = Var "y"
-z = Var "z"
+t = Variable "t"
+u = Variable "u"
+v = Variable "v"
+w = Variable "w"
+x = Variable "x"
+y = Variable "y"
+z = Variable "z"
 
 h = Add [Pow (Mul [N 2,V x]) (V x),Mul [Pow (Mul [N 2,V x]) (V x),N 2],Mul [V x,V x],Mul [V x,V y],Mul [V x,V z],Mul [V y,V z],Mul [N 2,V x],Mul [N 2,V y]]
 

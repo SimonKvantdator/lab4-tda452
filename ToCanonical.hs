@@ -134,8 +134,11 @@ combineTerms e
 
 -- Simplifies an expression containing an integer to the power of another integer
 combineNumsInPow :: Expr -> Expr
+combineNumsInPow (Pow (N 0) (N 0)) = Pow (N 0) (N 0)
 combineNumsInPow (Pow (N n) (N m))
     | m >= 0    = N $ n^m
+combineNumsInPow (Pow (N 0) _) = N 0
+combineNumsInPow (Pow _ (N 0)) = N 1
 combineNumsInPow e
     | isPow e   = combineNumsInPow <$$> e
     | isAdd e   = combineNumsInPow <$$> e

@@ -2,11 +2,11 @@ module Expression where
 
 import Data.List
 
-newtype Variable = Var String
+newtype Variable = Variable String
     deriving Eq
 
 instance Show Variable where
-    show (Var s) = s
+    show (Variable s) = s
 
 data Expr =
     N Integer
@@ -96,8 +96,8 @@ instance Ord Expr
 
 -- TODO: make minus look nice
 instance Show Expr where
-    show = show1
-    -- show = show2 -- More verbose show
+    -- show = show1
+    show = show2 -- More verbose show
 
 
 -- Shows a nice representation of the expression
