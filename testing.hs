@@ -79,7 +79,7 @@ instance Arbitrary Rule where
     arbitrary = return $ Rule (x, N 1)
     
 -- List of lists of compatible rules
-rulesAndCompatibleEvalRules :: (([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules))
+{-rulesAndCompatibleEvalRules :: (([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules))
 rulesAndCompatibleEvalRules =
     (
         (
@@ -136,17 +136,24 @@ rulesAndCompatibleEvalRules =
             ]
         )
     )
-
+-}
 -- rules = fst $ rulesAndCompatibleEvalRules!!0
 rules = ruleList
 -- evalRules = snd $ rulesAndCompatibleEvalRules!!0
 evalRules = EvalRules [(x, 24), (y, 3), (z, 12), (t, 0), (u, 0), (v, 0), (w, 0)]
 a = sample $ f <$> (arbitrary :: Gen Expr)
     where
-    f = \e -> [(e, eval evalRules e), (findSimplest' e rules, eval evalRules (findSimplest' e rules))]
+    f = \e -> [(e, eval evalRules e), (findSimplest e rules, eval evalRules (findSimplest e rules))]
 
 
--- TODO: property for checking that expression actually gets smaller
+-- Property testing if evaluating the expression equals evaluating the simplified expression
+findSimplestEvalEqualProp :: Expr -> [Rule] -> EvalRules -> Bool 
+findSimplestEvalEqualProp e rs ers = eval ers e == eval ers (findSimplest e rs)
+
+--Property testing if expression is larger than or equal in length to simplified expression
+findSimplestSmallerProp :: Expr -> [Rule] -> Bool 
+findSimplestSmallerProp e rs = lengthOfExpr e >= lengthOfExpr (findSimplest e rs)
+
 
 
 t = Var "t"
