@@ -15,38 +15,46 @@ data Expr =
     | Mul [Expr]
     | Pow Expr Expr
 
-
+-- Determines if expression is on the form Add [..]
 isAdd :: Expr -> Bool
 isAdd (Add _)   = True
 isAdd _         = False
 
+-- Extracts the list of terms in an addition
 fromAdd :: Expr -> [Expr]
 fromAdd (Add ts)  = ts
 fromAdd e         = [e]
 
+-- Determines if expression is on the form Mul [..]
 isMul :: Expr -> Bool
 isMul (Mul _)   = True
 isMul _         = False
 
+-- Extracts the list of factors in a multiplication
 fromMul :: Expr -> [Expr]
 fromMul (Mul fs)  = fs
 fromMul e         = [e]
 
+-- Determines if expression is on the form V (Var ..)
 isVariable :: Expr -> Bool
 isVariable (V _) = True
 isVariable  _ = False
 
+-- Determines if expression is on the form N ..
 isNumeric :: Expr -> Bool
 isNumeric (N _) = True
 isNumeric _ = False
 
+-- Extracts the numeric value as an integer 
 fromNumeric :: Expr -> Integer
 fromNumeric (N n) = n
 
+-- Determines if expression is on the form Pow .. ..
 isPow :: Expr -> Bool
 isPow (Pow _ _)   = True
 isPow _         = False
 
+-- Extracts a tuple of the base and the power
 fromPow :: Expr -> (Expr, Expr)
 fromPow (Pow s t) = (s,t)
 
@@ -59,6 +67,8 @@ emap f e = f e
 (<$$>) = emap
 infixr 4 <$$>
 
+
+-- INFIX OPERATORS FOR EACH OPERATION
 (.+) :: Expr -> Expr -> Expr
 x .+ y = Add [x, y]
 infixl 6 .+
@@ -71,18 +81,26 @@ infixl 6 .*
 x .- y = Add [x, N (-1) .* y]
 infixl 6 .-
 
--- (./) :: Expr -> Expr -> Expr
--- x ./ y = TODO
-
 (.^) :: Expr -> Expr -> Expr
 (.^) = Pow
 infixr 8 .^
+
+-- INSTANCES OF EQ, ORD AND SHOW
+instance Eq Expr
+    where
+    e == f = show1 e == show1 f
+
+instance Ord Expr
+    where
+    compare = comp
 
 -- TODO: make minus look nice
 instance Show Expr where
     show = show1
     -- show = show2 -- More verbose show
 
+
+-- Shows a nice representation of the expression
 show1 :: Expr -> String
 show1 (V v)              = show v
 show1 (N n)              = show n
@@ -111,6 +129,8 @@ show1 (Pow e (V v))      = "(" ++ show1 e ++ ")^" ++ show v
 
 show1 (Pow x1 x2)        = "(" ++ show1 x1 ++ ")^(" ++ show1 x2 ++ ")"
 
+
+-- Shows expression on the form of the data type
 show2 :: Expr -> String
 show2 (V v)     = "V " ++ show v
 show2 (N n)
@@ -120,17 +140,8 @@ show2 (Add ts)  = "Add [" ++ foldl (\x y -> x ++ "," ++ y) (show2 $ head ts) (sh
 show2 (Mul fs)  = "Mul [" ++ foldl (\x y -> x ++ "," ++ y) (show2 $ head fs) (show2 <$> tail fs) ++ "]"
 show2 (Pow x y) = "Pow (" ++ show2 x ++ ") (" ++ show2 y ++ ")"
 
-instance Eq Expr
-    where
-    e == f = show1 e == show1 f
 
-instance Ord Expr
-    where
-    compare = comp
-
-sortTerms :: [Expr] -> [Expr]
-sortTerms = sortBy comp
-
+-- Ordering placing constants at the front of expressions
 comp :: Expr -> Expr -> Ordering
 comp (N n) (N s)                                                         = compare n s
 comp (N n) _                                                             = LT

@@ -143,7 +143,7 @@ rules = ruleList
 evalRules = EvalRules [(x, 24), (y, 3), (z, 12), (t, 0), (u, 0), (v, 0), (w, 0)]
 a = sample $ f <$> (arbitrary :: Gen Expr)
     where
-    f = \e -> [(e, eval evalRules e), (findSimplest' e rules, eval evalRules (findSimplest' e rules))]
+    f = \e -> [(e, eval evalRules e), (findSimplest e rules, eval evalRules (findSimplest e rules))]
 
 
 -- Property testing if evaluating the expression equals evaluating the simplified expression
