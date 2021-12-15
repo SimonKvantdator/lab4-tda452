@@ -55,7 +55,7 @@ eval rules (N n)        = fromInteger n
 eval rules (V x)        = fromInteger $ fromJust $ lookup x (fromEvalRules rules)
 eval rules (Add ts)     = sum $ eval rules <$> ts
 eval rules (Mul fs)     = product $ eval rules <$> fs
-eval rules (Pow e1 e2)  = (eval rules e1)**(eval rules e2)
+eval rules (Pow e1 e2)  = eval rules e1**eval rules e2
 
 propFor :: (Expr -> Expr)
     -> (Expr, (EvalRules, EvalRules, EvalRules, EvalRules, EvalRules, EvalRules, EvalRules))
@@ -79,7 +79,7 @@ instance Arbitrary Rule where
     arbitrary = return $ Rule (x, N 1)
     
 -- List of lists of compatible rules
-rulesAndCompatibleEvalRules :: (([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules))
+{-rulesAndCompatibleEvalRules :: (([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules), ([Rule], EvalRules))
 rulesAndCompatibleEvalRules =
     (
         (
@@ -136,7 +136,7 @@ rulesAndCompatibleEvalRules =
             ]
         )
     )
-
+-}
 -- rules = fst $ rulesAndCompatibleEvalRules!!0
 rules = ruleList
 -- evalRules = snd $ rulesAndCompatibleEvalRules!!0
@@ -146,7 +146,14 @@ a = sample $ f <$> (arbitrary :: Gen Expr)
     f = \e -> [(e, eval evalRules e), (findSimplest' e rules, eval evalRules (findSimplest' e rules))]
 
 
--- TODO: property for checking that expression actually gets smaller
+-- Property testing if evaluating the expression equals evaluating the simplified expression
+findSimplestEvalEqualProp :: Expr -> [Rule] -> EvalRules -> Bool 
+findSimplestEvalEqualProp e rs ers = eval ers e == eval ers (findSimplest e rs)
+
+--Property testing if expression is larger than or equal in length to simplified expression
+findSimplestSmallerProp :: Expr -> [Rule] -> Bool 
+findSimplestSmallerProp e rs = lengthOfExpr e >= lengthOfExpr (findSimplest e rs)
+
 
 
 t = Var "t"

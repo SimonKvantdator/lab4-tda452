@@ -126,10 +126,10 @@ combineNumsInPow e
     | otherwise = e
 
 
-extractSingleElem :: Expr -> Expr
+{-extractSingleElem :: Expr -> Expr
 extractSingleElem (Mul [e]) = extractSingleElem e
 extractSingleElem (Add [e]) = extractSingleElem e
-extractSingleElem e = e 
+extractSingleElem e = e -}
             
 
 combinePwrsInMul :: Expr -> Expr
