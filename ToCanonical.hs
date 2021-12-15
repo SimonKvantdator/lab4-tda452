@@ -10,7 +10,7 @@ sortExpr e
     | isAdd e       = sortExpr <$$> Add (sortBy comp $ fromAdd e)
     | isMul e       = sortExpr <$$> Mul (sortBy comp $ fromMul e)
     | isPow e       = sortExpr <$$> e
-    -- | otherwise     = e
+    | otherwise     = e
 
 
 -- Removes nestled Add expressions (Add [1, Add [2,3]] = Add [1,2,3])

@@ -55,7 +55,7 @@ eval rules (N n)        = fromInteger n
 eval rules (V x)        = fromInteger $ fromJust $ lookup x (fromEvalRules rules)
 eval rules (Add ts)     = sum $ eval rules <$> ts
 eval rules (Mul fs)     = product $ eval rules <$> fs
-eval rules (Pow e1 e2)  = eval rules e1**eval rules e2
+eval rules (Pow e1 e2)  = (eval rules e1)**(eval rules e2)
 
 propFor :: (Expr -> Expr)
     -> (Expr, (EvalRules, EvalRules, EvalRules, EvalRules, EvalRules, EvalRules, EvalRules))
