@@ -1,4 +1,4 @@
-PWD /home/simon/Workspace/tda452/presentation
+PWD /home/simon/Workspace/tda452/lab4/presentation
 INPUT /usr/local/texlive/2019/texmf.cnf
 INPUT /usr/local/texlive/2019/texmf-dist/web2c/texmf.cnf
 INPUT /usr/local/texlive/2019/texmf-var/web2c/pdftex/pdflatex.fmt
@@ -468,6 +468,9 @@ INPUT /usr/local/texlive/2019/texmf-dist/fonts/tfm/public/cm/cmtt8.tfm
 INPUT /usr/local/texlive/2019/texmf-dist/fonts/tfm/public/cm/cmss17.tfm
 INPUT /usr/local/texlive/2019/texmf-dist/fonts/tfm/public/cm/cmss8.tfm
 INPUT /usr/local/texlive/2019/texmf-var/fonts/map/pdftex/updmap/pdftex.map
+OUTPUT presentation.vrb
+INPUT presentation.vrb
+INPUT presentation.vrb
 OUTPUT presentation.vrb
 INPUT presentation.vrb
 INPUT presentation.vrb
