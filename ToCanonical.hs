@@ -129,7 +129,6 @@ combineTerms e
                 ):ts
             | otherwise = t1 .+ combineTermsHelper2 (t2:ts)
         combineTermsHelper2 [t] = t
-        combineTermsHelper2 _ = undefined -- Mul [] encountered
 
 
 -- Simplifies an expression containing an integer to the power of another integer
@@ -209,13 +208,3 @@ toCanonical =
     expand .
     combineNumsInAdd . combineNumsInMul .
     flattenMul . flattenAdd
-
--- x = V $ Var "x"
--- y = V $ Var "y"
--- z = V $ Var "z"
-
--- h' = Add [Mul [Pow (Mul [N 2,x]) x,Mul [Pow (Mul [N 2,x]) x,N 2]],Mul [x,x],Mul [x,y],Mul [x,z],Mul [y,z],Mul [N 2,x],Mul [N 2,y]]
-
--- ruleList = [(Var "x", Mul [N 2, V (Var "z")]),(Var "y", N 3),(Var "z",N 4)]--(Var "z",Mul [N 4, V (Var "y")])] 
-
--- h = Add [N 2, Mul [N 3,Pow (N 3) (N 4)]]

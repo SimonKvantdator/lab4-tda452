@@ -19,7 +19,6 @@ newtype Rule = Rule (Variable, Expr)
 fromRule :: Rule -> (Variable, Expr)
 fromRule (Rule (x, e)) = (x, e)
 
--- generateMoreRules [x = y / z] = [x = y / z, y = x / z, z = y / x]
 
 -- Applies a rule to an expression
 applyRule :: Rule -> Expr -> Expr
@@ -29,37 +28,27 @@ applyRule r (Mul fs)                    = Mul (applyRule r <$> fs)
 applyRule r (Pow e1 e2)                 = Pow (applyRule r e1) (applyRule r e2)
 applyRule r e                           = e
 
--- applies a list of rules in order to an expression
-{-applyRules :: [Rule] -> Expr -> Expr
-applyRules [] e = e
-applyRules rs e = applyRules (tail rs) (applyRule (head rs) e)-}
 
 -- Finds simplest canonical expression using a list of rules
 findSimplest :: Expr -> [Rule] -> Expr
-findSimplest e rs = head $ findSimplestHelper depth [e] rs
+findSimplest e rs = minimumBy (compare `on` lengthOfExpr) $
+    findSimplestHelper depth [e] rs
     where
         findSimplestHelper :: Int -> [Expr] -> [Rule] -> [Expr]
         findSimplestHelper 0 es _  = es
         findSimplestHelper d es rs =
-            findSimplestHelper
+            es ++ findSimplestHelper
                 (d - 1)
-                (take numToKeepEachIteration $
+                (
+                    filter ((< cutoff) . lengthOfExpr) $
                     sortBy (compare `on` lengthOfExpr) $
-                    nub $ toCanonical <$> [applyRule r e| r <- rs, e <- es])
+                    nub
+                    (toCanonical <$> [applyRule r e| r <- rs, e <- es])
+                )
                 rs
-        depth = 30
-        numToKeepEachIteration = 10
+        depth = 7
+        cutoff = lengthOfExpr e + 2
 
-{-findSimplest' :: Expr -> [Rule] -> Expr
-findSimplest' e rs = minimumBy (compare `on` lengthOfExpr) $
-    map toCanonical (findSimplestHelper e $
-    (map . map) Rule $
-    nub $
-    concatMap subsequences (permutations $ fromRule <$> rs))
-    where
-    findSimplestHelper :: Expr -> [[Rule]] -> [Expr]
-    findSimplestHelper e []     = []
-    findSimplestHelper e rss    = applyRules (head rss) e:findSimplestHelper e (tail rss)-}
 
 -- Calculates the length of an expression (number of terms)
 lengthOfExpr :: Expr -> Integer
@@ -68,7 +57,6 @@ lengthOfExpr (Mul fs)       = product $ lengthOfExpr <$> fs
 lengthOfExpr (Pow e1 e2)    = 1 
 lengthOfExpr _              = 1
 
--- TODO: fix toLatex $ Add [(N 16) .* (x), N (-9), N 17, Mul [N (-14), N (-4), N 12, y]]
 
 -- Creates string on the form of LaTeX code for a simplified expression
 toLatex :: Expr -> String
@@ -83,14 +71,8 @@ toLatex (V x)                   = show x
 toLatex (N n)                   = show n
 toLatex _                       = ""
 
+
 -- Prints the LaTeX code for a simplified expression in the terminal
 printLatex :: Expr -> IO()
 printLatex e = putStrLn $ "$ " ++ toLatex e ++ " $"
 
-{-x = V $ Var "x"
-y = V $ Var "y"
-z = V $ Var "z"-}
-
--- h' = Add [Pow (Mul [N 2,x]) x,Mul [Pow (Mul [N 2,x]) x,N 2],Mul [x,x],Mul [x,y],Mul [x,z],Mul [y,z],Mul [N 2,x],Mul [N 2,y]]
---i = Add [(N 16) .* (x), N (-9), N 17, Mul [N (-14), N (-4), N 12, y]]
--- ruleList = Rule <$> [(Var "x", Mul [N 2, V (Var "z")]),(Var "y", N 3),(Var "z",Mul [N 4, V (Var "y")])]

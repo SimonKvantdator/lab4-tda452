@@ -94,10 +94,9 @@ instance Ord Expr
     where
     compare = comp
 
--- TODO: make minus look nice
 instance Show Expr where
-    -- show = show1
-    show = show2 -- More verbose show
+     show = show1
+    --show = show2 -- More verbose show
 
 
 -- Shows a nice representation of the expression

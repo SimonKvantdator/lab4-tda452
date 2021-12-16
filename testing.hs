@@ -210,10 +210,6 @@ rulesAndCompatibleEvalRules =
         )
     )
 
--- rules = fst $ rulesAndCompatibleEvalRules!!0
-rules = ruleList
--- evalRules = snd $ rulesAndCompatibleEvalRules!!0
-evalRules = EvalRules [(x, 24), (y, 3), (z, 12), (t, 0), (u, 0), (v, 0), (w, 0)]
 
 -- Property testing if evaluating the expression equals evaluating the simplified expression
 findSimplestProp :: Expr -> Bool
@@ -223,7 +219,7 @@ findSimplestProp e = (>= 6) . length $ filter id [
     | (rules, evalRules) <- toList rulesAndCompatibleEvalRules]
     where
     toList (er1, er2, er3, er4, er5, er6, er7) = [er1, er2, er3, er4, er5, er6, er7]
-    f = \e -> [(e, eval evalRules e), (findSimplest e rules, eval evalRules (findSimplest e rules))]
+    --f = \e -> [(e, eval evalRules e), (findSimplest e rules, eval evalRules (findSimplest e rules))]
 
 
 --Property testing if expression is larger than or equal in length to simplified expression
@@ -235,7 +231,7 @@ findSimplestSmallerProp e = and [lengthOfExpr e >= lengthOfExpr (findSimplest e 
             = [er1, er2, er3, er4, er5, er6, er7]
 
 
-
+-- Variables
 
 t = Variable "t"
 u = Variable "u"
@@ -245,6 +241,3 @@ x = Variable "x"
 y = Variable "y"
 z = Variable "z"
 
-h = Add [Pow (Mul [N 2,V x]) (V x),Mul [Pow (Mul [N 2,V x]) (V x),N 2],Mul [V x,V x],Mul [V x,V y],Mul [V x,V z],Mul [V y,V z],Mul [N 2,V x],Mul [N 2,V y]]
-
-ruleList = Rule <$> [(x, Mul [N 2, V z]),(y, N 3),(z,Mul [N 4, V y])]
