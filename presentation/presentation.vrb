@@ -1,11 +1,9 @@
-\frametitle{Example}
-	\begin{align}
-		&-28 + 16 x y + 7 z + 8 w x,\\
-		&x = y + 2 z\\
-        &z = 2 y^2\\
-        &w = z
-	\end{align}
-	\begin{align}
-		-28 + 14 y^2 + 80 x y^2
-	\end{align}
+\frametitle{\LaTeX{} code from expressions}
+
+	\begin{verbatim}
+		toLatex :: Expr -> String
+
+		> toLatex (Mul [N 2, Pow (V x) (N 4)])
+		    "2x^4"
+	\end{verbatim}
 	

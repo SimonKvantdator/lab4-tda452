@@ -32,7 +32,6 @@
 	\end{align}
 	
 \end{frame}
-
 \begin{frame}[fragile]
 	\frametitle{Our model}
 	\begin{verbatim}
@@ -77,15 +76,31 @@
 \end{frame}
 \begin{frame}[fragile]
 	\frametitle{Example}
+
+	Example from before:
 	\begin{align}
-		&-28 + 16 x y + 7 z + 8 w x,\\
-		&x = y + 2 z\\
-        &z = 2 y^2\\
-        &w = z
+		&x^4 + (y + 1) z, \\
+		&y = z - 1,\\
+		&z = x^2.
 	\end{align}
-	\begin{align}
-		-28 + 14 y^2 + 80 x y^2
-	\end{align}
+	\begin{verbatim}
+		> findSimplest
+		    (Pow (V x) (N 4) .+ ((V y .+ N 1) .* V z))
+		    [Rule (y, V z .- N 1), Rule (z, Pow (V x) (N 2))]
+
+		2*x^4
+	\end{verbatim}
+	
+\end{frame}
+\begin{frame}[fragile]
+	\frametitle{\LaTeX{} code from expressions}
+
+	\begin{verbatim}
+		toLatex :: Expr -> String
+
+		> toLatex (Mul [N 2, Pow (V x) (N 4)])
+		    "2x^4"
+	\end{verbatim}
 	
 \end{frame}
 
