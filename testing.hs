@@ -214,6 +214,8 @@ rulesAndCompatibleEvalRules =
 rules = ruleList
 -- evalRules = snd $ rulesAndCompatibleEvalRules!!0
 evalRules = EvalRules [(x, 24), (y, 3), (z, 12), (t, 0), (u, 0), (v, 0), (w, 0)]
+
+-- Property testing if evaluating the expression equals evaluating the simplified expression
 findSimplestProp :: Expr -> Bool
 findSimplestProp e = (>= 6) . length $ filter id [
     eval evalRules e ~=
@@ -224,13 +226,14 @@ findSimplestProp e = (>= 6) . length $ filter id [
     f = \e -> [(e, eval evalRules e), (findSimplest e rules, eval evalRules (findSimplest e rules))]
 
 
--- Property testing if evaluating the expression equals evaluating the simplified expression
-findSimplestEvalEqualProp :: Expr -> [Rule] -> EvalRules -> Bool 
-findSimplestEvalEqualProp e rs ers = eval ers e == eval ers (findSimplest e rs)
-
 --Property testing if expression is larger than or equal in length to simplified expression
-findSimplestSmallerProp :: Expr -> [Rule] -> Bool 
-findSimplestSmallerProp e rs = lengthOfExpr e >= lengthOfExpr (findSimplest e rs)
+findSimplestSmallerProp :: Expr -> Bool 
+findSimplestSmallerProp e = and [lengthOfExpr e >= lengthOfExpr (findSimplest e rs) 
+                            | rs <- map fst (toList rulesAndCompatibleEvalRules)]
+    where
+        toList (er1, er2, er3, er4, er5, er6, er7) 
+            = [er1, er2, er3, er4, er5, er6, er7]
+
 
 
 

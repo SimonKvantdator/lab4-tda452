@@ -76,16 +76,16 @@ toLatex (Add [e])               = toLatex e
 toLatex (Add (e:es))            = toLatex e ++ " + " ++ toLatex (Add es)
 toLatex (Mul [e])               = toLatex e
 toLatex (Mul (e:es))            = toLatex e ++  toLatex (Mul es)
-toLatex (Pow e1@(V (Var x)) e2) = toLatex e1 ++ " ^{ " ++ toLatex e2 ++ " }"
+toLatex (Pow e1@(V x) e2)       = toLatex e1 ++ " ^{ " ++ toLatex e2 ++ " }"
 toLatex (Pow e1@(N n) e2)       = toLatex e1 ++ " ^{ " ++ toLatex e2 ++ " }"
-toLatex (Pow e1 e2)             = "(" ++ toLatex e1 ++ ")" ++ " ^{ " ++ toLatex e2 ++ " }"
-toLatex (V (Var x))             = x
+toLatex (Pow e1 e2)             = " ( " ++ toLatex e1 ++ " ) " ++ " ^{ " ++ toLatex e2 ++ " }"
+toLatex (V x)                   = show x
 toLatex (N n)                   = show n
 toLatex _                       = ""
 
 -- Prints the LaTeX code for a simplified expression in the terminal
 printLatex :: Expr -> IO()
-printLatex e = putStrLn $ "$" ++ toLatex e ++ "$"
+printLatex e = putStrLn $ "$ " ++ toLatex e ++ " $"
 
 {-x = V $ Var "x"
 y = V $ Var "y"
