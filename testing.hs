@@ -32,8 +32,8 @@ rExpr = arbitraryPositiveInteger >>= rExprHelper . intLog
     rExprHelper n | n < 0 = undefined
     rExprHelper 0 = oneof [N <$> choose (-5, 5), V <$> arbitrary]
     rExprHelper n = frequency [
-        (3, Add <$> vectorOf 2 (rExprHelper (n - 1))),
-        (3, Mul <$> vectorOf 2 (rExprHelper (n - 1))),
+        (3, AC Add <$> vectorOf 2 (rExprHelper (n - 1))),
+        (3, AC Mul <$> vectorOf 2 (rExprHelper (n - 1))),
         (1, Pow <$> rExprHelper (n - 1) <*> rExprHelper (n - 1))
         ]
     arbitraryPositiveInteger = getPositive <$> (arbitrary :: Gen (Positive Integer))
@@ -54,8 +54,8 @@ fromEvalRules (EvalRules r) = r
 eval :: EvalRules -> Expr -> Float
 eval rules (N n)        = fromInteger n
 eval rules (V x)        = fromJust $ lookup x (fromEvalRules rules)
-eval rules (Add ts)     = sum $ eval rules <$> ts
-eval rules (Mul fs)     = product $ eval rules <$> fs
+eval rules (AC Add ts)     = sum $ eval rules <$> ts
+eval rules (AC Mul fs)     = product $ eval rules <$> fs
 eval rules (Pow e1 e2)  = (eval rules e1)**(eval rules e2)
 
 propFor :: (Expr -> Expr)
@@ -65,8 +65,8 @@ propFor f (e, ruless) = (>= 6) . length $ filter id [eval rules e ~= eval rules 
     where
     toList (er1, er2, er3, er4, er5, er6, er7) = [er1, er2, er3, er4, er5, er6, er7]
 
-flattenAddProp              = propFor flattenAdd
-flattenMulProp              = propFor flattenMul
+flattenAddProp              = propFor $ flattenAC Add
+flattenMulProp              = propFor $ flattenAC Mul
 combineTermsProp            = propFor combineTerms
 expandAndCombineTermsProp   = propFor $ expand . combineTerms
 sortExprProp                = propFor sortExpr
@@ -85,9 +85,9 @@ rulesAndCompatibleEvalRules =
     (
         (
             Rule <$> [
-                 (x, Add [V y, V z])
-                ,(z, Mul [N 2, Pow (V y) (N 2)])
-                ,(x, Add [V z, V w])
+                 (x, AC Add [V y, V z])
+                ,(z, AC Mul [N 2, Pow (V y) (N 2)])
+                ,(x, AC Add [V z, V w])
                 ,(t, N 0)
                 ,(u, N 0)
                 ,(v, N 0)
@@ -105,8 +105,8 @@ rulesAndCompatibleEvalRules =
         )
         ,(
             Rule <$> [
-                 (x, Add[V y, Mul [N (-1), V z]])
-                ,(t, Add[V u, V v])
+                 (x, AC Add[V y, AC Mul [N (-1), V z]])
+                ,(t, AC Add[V u, V v])
                 ,(x, V u)
                 ,(t, V z)
             ]
@@ -122,9 +122,9 @@ rulesAndCompatibleEvalRules =
         )
         ,(
             Rule <$> [
-                 (t, Mul [V u, V v])
-                ,(u, Add [V y, Mul [N (-1), V z]])
-                ,(y, Add [Mul [V u, V t], Pow (V x) (N 2), N 1])
+                 (t, AC Mul [V u, V v])
+                ,(u, AC Add [V y, AC Mul [N (-1), V z]])
+                ,(y, AC Add [AC Mul [V u, V t], Pow (V x) (N 2), N 1])
             ]
             ,EvalRules [
                  (t, -2)

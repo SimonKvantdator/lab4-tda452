@@ -23,8 +23,8 @@ fromRule (Rule (x, e)) = (x, e)
 -- Applies a rule to an expression
 applyRule :: Rule -> Expr -> Expr
 applyRule (Rule (x, e)) (V y) | x == y  = e
-applyRule r (Add ts)                    = Add (applyRule r <$> ts)
-applyRule r (Mul fs)                    = Mul (applyRule r <$> fs)
+applyRule r (AC Add ts)                 = AC Add (applyRule r <$> ts)
+applyRule r (AC Mul fs)                 = AC  Mul (applyRule r <$> fs)
 applyRule r (Pow e1 e2)                 = Pow (applyRule r e1) (applyRule r e2)
 applyRule r e                           = e
 
@@ -52,18 +52,18 @@ findSimplest e rs = minimumBy (compare `on` lengthOfExpr) $
 
 -- Calculates the length of an expression (number of terms)
 lengthOfExpr :: Expr -> Integer
-lengthOfExpr (Add ts)       = sum $ lengthOfExpr <$> ts
-lengthOfExpr (Mul fs)       = product $ lengthOfExpr <$> fs
+lengthOfExpr (AC Add ts)       = sum $ lengthOfExpr <$> ts
+lengthOfExpr (AC Mul fs)       = product $ lengthOfExpr <$> fs
 lengthOfExpr (Pow e1 e2)    = 1 
 lengthOfExpr _              = 1
 
 
 -- Creates string on the form of LaTeX code for a simplified expression
 toLatex :: Expr -> String
-toLatex (Add [e])               = toLatex e
-toLatex (Add (e:es))            = toLatex e ++ " + " ++ toLatex (Add es)
-toLatex (Mul [e])               = toLatex e
-toLatex (Mul (e:es))            = toLatex e ++  toLatex (Mul es)
+toLatex (AC Add [e])               = toLatex e
+toLatex (AC Add (e:es))            = toLatex e ++ " + " ++ toLatex (AC Add es)
+toLatex (AC Mul [e])               = toLatex e
+toLatex (AC Mul (e:es))            = toLatex e ++  toLatex (AC Mul es)
 toLatex (Pow e1@(V x) e2)       = toLatex e1 ++ " ^{ " ++ toLatex e2 ++ " }"
 toLatex (Pow e1@(N n) e2)       = toLatex e1 ++ " ^{ " ++ toLatex e2 ++ " }"
 toLatex (Pow e1 e2)             = " ( " ++ toLatex e1 ++ " ) " ++ " ^{ " ++ toLatex e2 ++ " }"
