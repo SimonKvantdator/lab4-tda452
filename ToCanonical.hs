@@ -6,7 +6,7 @@ import Data.List
 
 -- Sorting an expression according to ordering defined in comp
 sortExpr :: Expr -> Expr
-sortExpr (AC op es)         = sortExpr <$$> AC op (sortBy comp $ es)
+sortExpr e@(AC op es)       = AC op (sortBy comp $ fromAC (sortExpr <$$> e))
 sortExpr e@(Pow _ _)        = sortExpr <$$> e
 sortExpr e                  = e
 
