@@ -9,7 +9,7 @@ instance Show Variable where
     show (Variable s) = s
 
 data Op = Add | Mul
- deriving Eq
+    deriving Eq
 
 data Expr =
     N Integer

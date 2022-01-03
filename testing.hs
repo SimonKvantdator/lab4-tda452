@@ -5,6 +5,7 @@ import ToCanonical
 import Simplify
 import Data.Maybe
 import Test.QuickCheck
+import Data.List
 
 intLog :: Integer -> Integer
 intLog = floor . logBase 2.0 . fromIntegral
@@ -73,6 +74,62 @@ sortExprProp                = propFor sortExpr
 expandProp                  = propFor expand
 toCanonicalProp             = propFor toCanonical
 
+flattenAddProp2 :: Expr -> Bool
+flattenAddProp2 = 
+    flattenAddProp2Helper True . flattenAC Add
+    where
+    flattenAddProp2Helper :: Bool -> Expr -> Bool
+    flattenAddProp2Helper b (AC Add ts)    = not (any isAdd ts) && all (flattenAddProp2Helper b) ts 
+    flattenAddProp2Helper b e           = prop2HelperFallback b e
+
+flattenMulProp2 :: Expr -> Bool
+flattenMulProp2 = 
+    flattenMulProp2Helper True . flattenAC Mul
+    where
+    flattenMulProp2Helper :: Bool -> Expr -> Bool
+    flattenMulProp2Helper b (AC Mul fs)    = not (any isMul fs) && all (flattenMulProp2Helper b) fs 
+    flattenMulProp2Helper b e           = prop2HelperFallback b e
+
+combineTermsProp2 :: Expr -> Bool
+combineTermsProp2 = 
+    -- Note than flattenAC Add and flattenAC Mul needs to be applied first
+    combineTermsProp2Helper True . combineTerms . flattenAC Add . flattenAC Mul
+    where
+    combineTermsProp2Helper :: Bool -> Expr -> Bool
+    combineTermsProp2Helper b (AC Add ts)  = not (hasDuplicates ts) && all (combineTermsProp2Helper b) ts 
+    combineTermsProp2Helper b e         = prop2HelperFallback b e
+
+    -- Checks if list of expressions has duplicates. Does not consider numerical coefficients.
+    hasDuplicates :: [Expr] -> Bool
+    hasDuplicates = (\x -> nub x /= x) . map removeNumericFactors
+
+sortExprProp2 :: Expr -> Bool
+sortExprProp2 = 
+    sortExprProp2Helper True . sortExpr . flattenAC Add . flattenAC Mul
+    where
+    sortExprProp2Helper :: Bool -> Expr -> Bool
+    sortExprProp2Helper b (AC Add ts)    = isSorted ts && all (sortExprProp2Helper b) ts 
+    sortExprProp2Helper b (AC Mul fs)    = isSorted fs && all (sortExprProp2Helper b) fs 
+    sortExprProp2Helper b e           = prop2HelperFallback b e
+
+    -- Checks if list of expressions has duplicates. Does not consider numerical coefficients.
+    isSorted :: [Expr] -> Bool
+    isSorted = and . (zipWith (<=) <*> tail)
+
+expandProp2 :: Expr -> Bool
+expandProp2 = 
+    expandProp2Helper True . expand . flattenAC Add . flattenAC Mul
+    where
+    expandProp2Helper :: Bool -> Expr -> Bool
+    expandProp2Helper b (AC Mul fs)    = not (any isAdd fs) && all (expandProp2Helper b) fs 
+    expandProp2Helper b e           = prop2HelperFallback b e
+
+prop2HelperFallback :: Bool -> Expr -> Bool
+prop2HelperFallback False _       = False
+prop2HelperFallback b (AC Add ts)    = all (prop2HelperFallback b) ts 
+prop2HelperFallback b (AC Mul fs)    = all (prop2HelperFallback b) fs 
+prop2HelperFallback b (Pow e1 e2) = all (prop2HelperFallback b) [e1, e2]
+prop2HelperFallback b _           = True
 
 -- ###########################{ Testing Simplify }###########################
 
