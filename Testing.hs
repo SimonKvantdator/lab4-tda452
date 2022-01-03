@@ -1,3 +1,5 @@
+module Testing where
+
 -- Function eval was taken from from lecture 4A
 
 import Expression
@@ -33,9 +35,9 @@ rExpr = arbitraryPositiveInteger >>= rExprHelper . intLog
     rExprHelper n | n < 0 = undefined
     rExprHelper 0 = oneof [N <$> choose (-5, 5), V <$> arbitrary]
     rExprHelper n = frequency [
-        (3, AC Add <$> vectorOf 2 (rExprHelper (n - 1))),
-        (3, AC Mul <$> vectorOf 2 (rExprHelper (n - 1))),
-        (1, Pow <$> rExprHelper (n - 1) <*> rExprHelper (n - 1))
+        (3, AC Add <$> vectorOf 2 (rExprHelper (n `div` 2))),
+        (3, AC Mul <$> vectorOf 2 (rExprHelper (n `div` 2))),
+        (1, Pow <$> rExprHelper (n `div` 2) <*> rExprHelper (n `div` 2))
         ]
     arbitraryPositiveInteger = getPositive <$> (arbitrary :: Gen (Positive Integer))
 
